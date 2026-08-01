@@ -1,0 +1,78 @@
+{# ===========================================================================
+   Mural de avisos — visao de aluno e responsavel.
+
+   Formato de cartoes (e nao tabela): o publico aqui le comunicados, nao
+   administra registros, e o cartao funciona melhor no celular.
+   =========================================================================== #}
+{% extends 'base.html' %}
+
+{% block titulo %}Avisos{% endblock %}
+{% block titulo_pagina %}Avisos{% endblock %}
+
+{% block subtitulo %}
+  <p>Comunicados da escola.</p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if avisos %}
+    <div class="d-flex flex-column gap-3">
+      {% for aviso in avisos %}
+        <a href="{{ url_for('avisos.detalhe', aviso_id=aviso.id) }}"
+           class="card text-reset text-decoration-none
+                  {{ 'border-primary' if aviso.id in nao_lidos }}">
+          <div class="card-body">
+            <div class="d-flex align-items-start gap-3">
+              <div class="sge-indicador__icone sge-icone--{{ 'perigo' if aviso.prioridade.value == 'urgente'
+                                                          else ('alerta' if aviso.prioridade.value == 'alta'
+                                                          else 'primaria') }} flex-shrink-0">
+                <i class="bi bi-megaphone"></i>
+              </div>
+
+              <div class="min-w-0 flex-grow-1">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                  <h3 class="h6 mb-0 sge-quebra">{{ aviso.titulo }}</h3>
+                  {% if aviso.id in nao_lidos %}
+                    <span class="badge text-bg-primary">Novo</span>
+                  {% endif %}
+                  {% if aviso.fixado %}
+                    <i class="bi bi-pin-angle-fill text-warning"
+                       data-bs-toggle="tooltip" title="Aviso fixado"></i>
+                  {% endif %}
+                  {% if aviso.prioridade.value in ['alta', 'urgente'] %}
+                    <span class="badge sge-badge-suave text-bg-{{ aviso.prioridade.cor }}">
+                      {{ aviso.prioridade.rotulo }}
+                    </span>
+                  {% endif %}
+                </div>
+
+                <p class="small sge-texto-suave mb-2 sge-quebra">
+                  {{ aviso.texto_resumido }}
+                </p>
+
+                <div class="small sge-texto-fraco">
+                  <i class="bi bi-person me-1"></i>{{ aviso.nome_autor }}
+                  &middot; {{ aviso.criado_em | tempo_relativo }}
+                  {% if aviso.turma %}
+                    &middot; <i class="bi bi-people me-1"></i>{{ aviso.turma.identificacao_curta }}
+                  {% endif %}
+                </div>
+              </div>
+
+              <i class="bi bi-chevron-right sge-texto-fraco"></i>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-megaphone"></i>
+      <h5>Nenhum aviso no momento</h5>
+      <p class="mb-0">
+        Quando a escola publicar um comunicado, ele aparecera aqui.
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}

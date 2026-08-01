@@ -1,0 +1,331 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import selecao, area_texto, campo %}
+
+{% block titulo %}Matricula {{ matricula.numero }}{% endblock %}
+{% block titulo_pagina %}Matricula {{ matricula.numero }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('matriculas.listar') }}">Matriculas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ matricula.numero }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.BOLETIM_VISUALIZAR) %}
+    <a href="{{ url_for('boletim.do_aluno', aluno_id=matricula.aluno_id) }}" class="btn btn-light">
+      <i class="bi bi-journal-text"></i> Boletim
+    </a>
+  {% endif %}
+  <a href="{{ url_for('alunos.detalhe', aluno_id=matricula.aluno_id) }}" class="btn btn-primary">
+    <i class="bi bi-person"></i> Ficha do aluno
+  </a>
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Cabecalho --- #}
+  {% set aluno = matricula.aluno %}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      {% if aluno.foto %}
+        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+             alt="" class="sge-avatar sge-avatar--lg">
+      {% else %}
+        <span class="sge-avatar sge-avatar--lg">{{ aluno.iniciais }}</span>
+      {% endif %}
+      <div class="min-w-0 flex-grow-1">
+        <h2 class="h5 mb-1 sge-quebra">{{ aluno.nome_exibicao }}</h2>
+        <div class="small sge-texto-suave">
+          Codigo {{ aluno.codigo }}
+          {% if aluno.idade is not none %} &middot; {{ aluno.idade }} anos{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <span class="badge sge-badge-suave text-bg-{{ matricula.situacao.cor }}">
+            {{ matricula.situacao.rotulo }}
+          </span>
+          <span class="badge sge-badge-suave text-bg-{{ matricula.resultado_final.cor }}">
+            {{ matricula.resultado_final.rotulo }}
+          </span>
+          {% if matricula.turma %}
+            <a href="{{ url_for('turmas.detalhe', turma_id=matricula.turma.id) }}"
+               class="badge sge-badge-suave text-bg-primary text-decoration-none">
+              <i class="bi bi-diagram-3 me-1"></i>{{ matricula.turma.nome_completo }}
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if not matricula.aceita_lancamentos and matricula.situacao.value == 'ativa' %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-lock-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        O ano letivo de {{ matricula.ano_letivo.ano if matricula.ano_letivo }} nao
+        esta em andamento. Novos lancamentos de nota e frequencia estao
+        bloqueados para preservar o historico.
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="row g-3">
+    {# --- Dados da matricula --- #}
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-file-earmark-text text-primary"></i> Dados da matricula
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 sge-texto-suave">Numero</dt>
+            <dd class="col-7 sge-numerico">{{ matricula.numero }}</dd>
+            <dt class="col-5 sge-texto-suave">Ano letivo</dt>
+            <dd class="col-7 sge-numerico">
+              {{ matricula.ano_letivo.ano if matricula.ano_letivo else '—' }}
+            </dd>
+            <dt class="col-5 sge-texto-suave">Turma</dt>
+            <dd class="col-7">
+              {{ matricula.turma.nome_completo if matricula.turma else '—' }}
+            </dd>
+            <dt class="col-5 sge-texto-suave">Data da matricula</dt>
+            <dd class="col-7 sge-numerico">{{ matricula.data_matricula | data }}</dd>
+            {% if matricula.data_saida %}
+              <dt class="col-5 sge-texto-suave">Data de saida</dt>
+              <dd class="col-7 sge-numerico text-danger">{{ matricula.data_saida | data }}</dd>
+            {% endif %}
+            {% if matricula.escola_origem %}
+              <dt class="col-5 sge-texto-suave">Escola de origem</dt>
+              <dd class="col-7">{{ matricula.escola_origem }}</dd>
+            {% endif %}
+            {% if matricula.escola_destino %}
+              <dt class="col-5 sge-texto-suave">Escola de destino</dt>
+              <dd class="col-7">{{ matricula.escola_destino }}</dd>
+            {% endif %}
+            {% if matricula.motivo_saida %}
+              <dt class="col-5 sge-texto-suave">Motivo da saida</dt>
+              <dd class="col-7 sge-quebra">{{ matricula.motivo_saida }}</dd>
+            {% endif %}
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    {# --- Consolidacao --- #}
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-graph-up text-primary"></i> Consolidacao do ano
+        </div>
+        <div class="card-body">
+          <div class="row g-3 text-center">
+            <div class="col-4">
+              <div class="p-2 rounded" style="background: var(--sge-superficie-alt);">
+                <div class="sge-indicador__rotulo">Media</div>
+                <div class="h5 mb-0 sge-numerico">
+                  {{ matricula.media_geral | nota if matricula.media_geral is not none else '—' }}
+                </div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 rounded" style="background: var(--sge-superficie-alt);">
+                <div class="sge-indicador__rotulo">Frequencia</div>
+                <div class="h5 mb-0 sge-numerico">
+                  {{ matricula.percentual_frequencia | percentual if matricula.percentual_frequencia is not none else '—' }}
+                </div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 rounded" style="background: var(--sge-superficie-alt);">
+                <div class="sge-indicador__rotulo">Faltas</div>
+                <div class="h5 mb-0 sge-numerico">
+                  {{ matricula.total_faltas if matricula.total_faltas is not none else '—' }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="form-text mt-3 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Valores consolidados no fechamento do periodo. Para o desempenho
+            atualizado, consulte o boletim.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {% if matricula.observacoes %}
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-sticky text-primary"></i> Observacoes</div>
+          <div class="card-body small">{{ matricula.observacoes | quebra_linha }}</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Acoes sobre a matricula                                            #}
+  {# ------------------------------------------------------------------ #}
+  {% if tem_permissao(Permissao.MATRICULA_TRANSFERIR)
+     or tem_permissao(Permissao.MATRICULA_CANCELAR)
+     or tem_permissao(Permissao.MATRICULA_EDITAR) %}
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-gear text-primary"></i> Acoes</div>
+      <div class="card-body">
+
+        {% if matricula.situacao.value == 'ativa' %}
+          <div class="row g-3">
+
+            {# --- Transferir de turma --- #}
+            {% if tem_permissao(Permissao.MATRICULA_TRANSFERIR) and form_turma.nova_turma_id.choices %}
+              <div class="col-12 col-lg-6">
+                <div class="border rounded p-3 h-100">
+                  <h6 class="mb-2"><i class="bi bi-arrow-left-right me-1"></i> Transferir de turma</h6>
+                  <p class="small sge-texto-suave">
+                    Move o aluno para outra turma do mesmo ano letivo.
+                    Notas e frequencia lancadas sao preservadas.
+                  </p>
+                  <form method="post" action="{{ url_for('matriculas.transferir_turma', matricula_id=matricula.id) }}">
+                    {{ form_turma.hidden_tag() }}
+                    <div class="row g-2">
+                      {{ selecao(form_turma.nova_turma_id, coluna='col-12') }}
+                      {{ area_texto(form_turma.motivo, coluna='col-12', linhas=2) }}
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-sm btn-primary w-100">
+                          <i class="bi bi-arrow-left-right"></i> Transferir
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+
+            {# --- Transferir de escola --- #}
+            {% if tem_permissao(Permissao.MATRICULA_TRANSFERIR) %}
+              <div class="col-12 col-lg-6">
+                <div class="border rounded p-3 h-100">
+                  <h6 class="mb-2"><i class="bi bi-box-arrow-right me-1"></i> Transferir para outra escola</h6>
+                  <p class="small sge-texto-suave">
+                    Encerra a matricula. O historico permanece disponivel para
+                    emissao de documentos.
+                  </p>
+                  <form method="post" action="{{ url_for('matriculas.transferir_escola', matricula_id=matricula.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Transferir para outra escola"
+                        data-confirmar-texto="A matricula sera encerrada. Esta acao pode ser revertida apenas por uma nova matricula."
+                        data-confirmar-botao="Confirmar transferencia"
+                        data-confirmar-cor="warning">
+                    {{ form_escola.hidden_tag() }}
+                    <div class="row g-2">
+                      {{ campo(form_escola.escola_destino, coluna='col-12') }}
+                      {{ area_texto(form_escola.motivo, coluna='col-12', linhas=2) }}
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-sm btn-warning w-100">
+                          <i class="bi bi-box-arrow-right"></i> Transferir
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+
+            {# --- Trancar --- #}
+            {% if tem_permissao(Permissao.MATRICULA_EDITAR) %}
+              <div class="col-12 col-lg-6">
+                <div class="border rounded p-3 h-100">
+                  <h6 class="mb-2"><i class="bi bi-pause-circle me-1"></i> Trancar matricula</h6>
+                  <p class="small sge-texto-suave">
+                    Suspende temporariamente a matricula mantendo a vaga do aluno.
+                  </p>
+                  <form method="post" action="{{ url_for('matriculas.trancar', matricula_id=matricula.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Trancar matricula"
+                        data-confirmar-texto="A vaga sera mantida e a matricula podera ser reativada depois."
+                        data-confirmar-botao="Trancar"
+                        data-confirmar-cor="warning">
+                    {{ form_encerrar.hidden_tag() }}
+                    <div class="row g-2">
+                      {{ area_texto(form_encerrar.motivo, coluna='col-12', linhas=2) }}
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">
+                          <i class="bi bi-pause-circle"></i> Trancar
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+
+            {# --- Cancelar --- #}
+            {% if tem_permissao(Permissao.MATRICULA_CANCELAR) %}
+              <div class="col-12 col-lg-6">
+                <div class="border border-danger-subtle rounded p-3 h-100">
+                  <h6 class="mb-2 text-danger"><i class="bi bi-x-circle me-1"></i> Cancelar matricula</h6>
+                  <p class="small sge-texto-suave">
+                    Registra desistencia ou evasao. A vaga e liberada na turma.
+                  </p>
+                  <form method="post" action="{{ url_for('matriculas.cancelar', matricula_id=matricula.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Cancelar matricula"
+                        data-confirmar-texto="A vaga sera liberada na turma. O historico do aluno sera preservado."
+                        data-confirmar-botao="Cancelar matricula">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-2">
+                      <div class="col-12">
+                        <label class="form-label sge-obrigatorio" for="motivoCancelamento">Motivo</label>
+                        <textarea class="form-control" id="motivoCancelamento" name="motivo"
+                                  rows="2" required maxlength="500"></textarea>
+                      </div>
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                          <i class="bi bi-x-circle"></i> Cancelar matricula
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+
+          </div>
+
+        {% elif matricula.situacao.value in ['trancada', 'cancelada'] %}
+          {% if tem_permissao(Permissao.MATRICULA_EDITAR) %}
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div class="min-w-0">
+                <h6 class="mb-1"><i class="bi bi-arrow-clockwise me-1"></i> Reativar matricula</h6>
+                <p class="small sge-texto-suave mb-0">
+                  Retorna a matricula a situacao ativa, se a turma ainda tiver vaga.
+                </p>
+              </div>
+              <form method="post" action="{{ url_for('matriculas.reativar', matricula_id=matricula.id) }}"
+                    data-confirmar
+                    data-confirmar-titulo="Reativar matricula"
+                    data-confirmar-texto="A matricula voltara a situacao ativa e ocupara uma vaga na turma."
+                    data-confirmar-botao="Reativar"
+                    data-confirmar-cor="primary">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-arrow-clockwise"></i> Reativar
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="mb-0 small sge-texto-suave">
+            <i class="bi bi-info-circle me-1"></i>
+            Esta matricula esta {{ matricula.situacao.rotulo.lower() }} e nao
+            aceita novas acoes. Para reintegrar o aluno, efetive uma nova
+            matricula.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

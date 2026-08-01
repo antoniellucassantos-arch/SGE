@@ -1,0 +1,40 @@
+{% extends 'pessoas/detalhe_base.html' %}
+{% set registro = funcionario %}
+
+{% block emblemas_extras %}
+  <span class="badge sge-badge-suave text-bg-primary">
+    <i class="bi bi-briefcase me-1"></i>{{ funcionario.cargo }}
+  </span>
+  {% if funcionario.setor %}
+    <span class="badge sge-badge-suave text-bg-info">{{ funcionario.setor }}</span>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo_especifico %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-briefcase text-primary"></i> Dados funcionais
+    </div>
+    <div class="card-body">
+      <dl class="row mb-0 small">
+        <dt class="col-5 col-md-3 sge-texto-suave">Cargo</dt>
+        <dd class="col-7 col-md-9">{{ funcionario.cargo }}</dd>
+        <dt class="col-5 col-md-3 sge-texto-suave">Setor</dt>
+        <dd class="col-7 col-md-9">{{ funcionario.setor or '—' }}</dd>
+        <dt class="col-5 col-md-3 sge-texto-suave">Admissao</dt>
+        <dd class="col-7 col-md-9 sge-numerico">
+          {{ funcionario.data_admissao | data }}
+          {% if funcionario.tempo_casa_anos is not none %}
+            <span class="sge-texto-fraco">({{ funcionario.tempo_casa_anos }} ano(s) de casa)</span>
+          {% endif %}
+        </dd>
+        <dt class="col-5 col-md-3 sge-texto-suave">Carga horaria</dt>
+        <dd class="col-7 col-md-9 sge-numerico">{{ funcionario.carga_horaria_semanal }}h semanais</dd>
+        {% if funcionario.data_desligamento %}
+          <dt class="col-5 col-md-3 sge-texto-suave">Desligamento</dt>
+          <dd class="col-7 col-md-9 sge-numerico text-danger">{{ funcionario.data_desligamento | data }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+{% endblock %}

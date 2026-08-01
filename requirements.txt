@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+# SGE - Sistema de Gestao Escolar
+# Dependencias de producao
+# Python 3.12
+# ---------------------------------------------------------------------------
+
+# --- Core web framework -----------------------------------------------------
+Flask==3.0.3
+Werkzeug==3.0.4
+Jinja2==3.1.4
+itsdangerous==2.2.0
+click==8.1.7
+blinker==1.8.2
+
+# --- Banco de dados / ORM ---------------------------------------------------
+SQLAlchemy==2.0.35
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+alembic==1.13.3
+
+# --- Autenticacao e sessao --------------------------------------------------
+Flask-Login==0.6.3
+argon2-cffi==23.1.0
+
+# --- Formularios, validacao e CSRF -----------------------------------------
+Flask-WTF==1.2.1
+WTForms==3.1.2
+email-validator==2.2.0
+
+# --- Seguranca --------------------------------------------------------------
+Flask-Limiter==3.8.0
+
+# --- Configuracao -----------------------------------------------------------
+python-dotenv==1.0.1
+
+# --- Relatorios: PDF e Excel ------------------------------------------------
+# ReportLab e Python puro e funciona no Windows sem dependencias nativas
+# (WeasyPrint exigiria a instalacao do GTK, inviavel para o ambiente da escola).
+reportlab==4.2.5
+openpyxl==3.1.5
+
+# --- Utilitarios ------------------------------------------------------------
+Pillow==10.4.0
+python-dateutil==2.9.0.post0
+
+# --- Producao ---------------------------------------------------------------
+# Descomente ao publicar em servidor Linux com PostgreSQL:
+# gunicorn==23.0.0
+# psycopg[binary]==3.2.3

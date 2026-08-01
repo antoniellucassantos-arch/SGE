@@ -1,0 +1,21 @@
+{% extends 'pessoas/formulario_base.html' %}
+{% from 'componentes/campo.html' import campo %}
+
+{% block campos_especificos %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-briefcase text-primary"></i> Dados profissionais
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ campo(form.profissao, coluna='col-12 col-md-4') }}
+        {{ campo(form.local_trabalho, coluna='col-12 col-md-5') }}
+        {{ campo(form.telefone_trabalho, coluna='col-12 col-md-3', mascara='telefone') }}
+      </div>
+      <p class="form-text mb-0 mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Estes dados sao usados apenas para contato em caso de emergencia.
+      </p>
+    </div>
+  </div>
+{% endblock %}

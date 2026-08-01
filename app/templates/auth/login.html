@@ -1,0 +1,61 @@
+{% extends 'auth/base_auth.html' %}
+{% from 'componentes/campo.html' import senha as campo_senha %}
+
+{% block titulo %}Entrar{% endblock %}
+
+{% block conteudo %}
+  <div class="mb-4">
+    <h2 class="h5 mb-1">Entrar no sistema</h2>
+    <p class="sge-texto-fraco small mb-0">
+      Informe suas credenciais para acessar o painel.
+    </p>
+  </div>
+
+  {% if escola and escola.mensagem_login %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1 small">{{ escola.mensagem_login }}</div>
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}"
+        novalidate data-permitir-reenvio>
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      <label for="{{ form.email.id }}" class="form-label sge-obrigatorio">
+        {{ form.email.label.text }}
+      </label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-envelope"></i></span>
+        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+        {% if form.email.errors %}
+          <div class="invalid-feedback">{{ form.email.errors[0] }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      {{ campo_senha(form.senha) }}
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div class="form-check mb-0">
+        {{ form.lembrar(class="form-check-input") }}
+        <label class="form-check-label small" for="{{ form.lembrar.id }}">
+          {{ form.lembrar.label.text }}
+        </label>
+      </div>
+      <a href="{{ url_for('auth.recuperar_senha') }}" class="small">Esqueci minha senha</a>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100">
+      <i class="bi bi-box-arrow-in-right"></i>
+      Entrar
+    </button>
+  </form>
+{% endblock %}
+
+{% block rodape %}
+  Nao tem acesso? Procure a secretaria da escola para solicitar seu cadastro.
+{% endblock %}

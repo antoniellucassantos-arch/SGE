@@ -1,0 +1,147 @@
+{# ===========================================================================
+   Macros de renderizacao de campos de formulario.
+
+   Concentram a marcacao do Bootstrap 5 em um unico lugar: o estado de erro,
+   o texto de ajuda e o indicador de obrigatoriedade ficam identicos em todo
+   o sistema, e um ajuste visual futuro e feito uma vez so.
+   =========================================================================== #}
+
+{# --- Campo de texto, e-mail, numero, data, etc. --- #}
+{% macro campo(field, icone=None, ajuda=None, coluna="col-12", mascara=None, placeholder=None) %}
+  <div class="{{ coluna }}">
+    <label for="{{ field.id }}" class="form-label {% if field.flags.required %}sge-obrigatorio{% endif %}">
+      {{ field.label.text }}
+    </label>
+    {% if icone %}
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi {{ icone }}"></i></span>
+        {{ field(class="form-control" + (" is-invalid" if field.errors else ""),
+                 placeholder=placeholder or field.render_kw.get('placeholder', '') if field.render_kw else placeholder,
+                 **({'data-mascara': mascara} if mascara else {})) }}
+        {% if field.errors %}
+          <div class="invalid-feedback">{{ field.errors[0] }}</div>
+        {% endif %}
+      </div>
+    {% else %}
+      {{ field(class="form-control" + (" is-invalid" if field.errors else ""),
+               **({'data-mascara': mascara} if mascara else {})) }}
+      {% if field.errors %}
+        <div class="invalid-feedback">{{ field.errors[0] }}</div>
+      {% endif %}
+    {% endif %}
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Campo de selecao --- #}
+{% macro selecao(field, ajuda=None, coluna="col-12", ao_mudar=False) %}
+  <div class="{{ coluna }}">
+    <label for="{{ field.id }}" class="form-label {% if field.flags.required %}sge-obrigatorio{% endif %}">
+      {{ field.label.text }}
+    </label>
+    {{ field(class="form-select" + (" is-invalid" if field.errors else ""),
+             **({'data-enviar-ao-mudar': '1'} if ao_mudar else {})) }}
+    {% if field.errors %}
+      <div class="invalid-feedback">{{ field.errors[0] }}</div>
+    {% endif %}
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Area de texto --- #}
+{% macro area_texto(field, ajuda=None, coluna="col-12", linhas=3) %}
+  <div class="{{ coluna }}">
+    <label for="{{ field.id }}" class="form-label {% if field.flags.required %}sge-obrigatorio{% endif %}">
+      {{ field.label.text }}
+    </label>
+    {{ field(class="form-control" + (" is-invalid" if field.errors else ""), rows=linhas) }}
+    {% if field.errors %}
+      <div class="invalid-feedback">{{ field.errors[0] }}</div>
+    {% endif %}
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Caixa de selecao --- #}
+{% macro caixa(field, ajuda=None, coluna="col-12") %}
+  <div class="{{ coluna }}">
+    <div class="form-check">
+      {{ field(class="form-check-input" + (" is-invalid" if field.errors else "")) }}
+      <label class="form-check-label" for="{{ field.id }}">{{ field.label.text }}</label>
+      {% if field.errors %}
+        <div class="invalid-feedback d-block">{{ field.errors[0] }}</div>
+      {% endif %}
+    </div>
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Campo de senha com botao de exibir/ocultar --- #}
+{% macro senha(field, ajuda=None, coluna="col-12", medidor=None) %}
+  <div class="{{ coluna }}">
+    <label for="{{ field.id }}" class="form-label sge-obrigatorio">{{ field.label.text }}</label>
+    <div class="sge-senha-wrapper">
+      {{ field(class="form-control pe-5" + (" is-invalid" if field.errors else ""),
+               **({'data-forca-senha': medidor} if medidor else {})) }}
+      <button type="button" class="sge-senha-alternar"
+              data-alternar-senha="{{ field.id }}" aria-label="Exibir senha" tabindex="-1">
+        <i class="bi bi-eye"></i>
+      </button>
+      {% if field.errors %}
+        <div class="invalid-feedback d-block">{{ field.errors[0] }}</div>
+      {% endif %}
+    </div>
+    {% if medidor %}
+      <div id="{{ medidor }}" class="mt-2">
+        <div class="sge-forca-senha"><div class="sge-forca-senha__barra"></div></div>
+        <div class="small mt-1" data-forca-rotulo></div>
+      </div>
+    {% endif %}
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Upload de arquivo com previa da imagem atual --- #}
+{% macro arquivo(field, ajuda=None, coluna="col-12", atual=None, pasta='usuarios') %}
+  <div class="{{ coluna }}">
+    <label for="{{ field.id }}" class="form-label">{{ field.label.text }}</label>
+    <div class="d-flex align-items-center gap-3">
+      {% if atual %}
+        <img src="{{ url_for('static', filename='uploads/' ~ pasta ~ '/' ~ atual) }}"
+             alt="Imagem atual" class="sge-avatar sge-avatar--md">
+      {% endif %}
+      <div class="flex-grow-1">
+        {{ field(class="form-control" + (" is-invalid" if field.errors else "")) }}
+        {% if field.errors %}
+          <div class="invalid-feedback">{{ field.errors[0] }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% if ajuda %}<div class="form-text">{{ ajuda }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# --- Bloco que lista todos os erros do formulario no topo --- #}
+{% macro resumo_erros(form) %}
+  {% if form.errors %}
+    <div class="alert alert-danger" role="alert">
+      <i class="bi bi-exclamation-octagon-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Corrija os campos abaixo antes de continuar.</strong>
+        <ul class="mb-0 mt-1 ps-3 small">
+          {% for campo_nome, mensagens in form.errors.items() %}
+            {% for mensagem in mensagens %}
+              <li>
+                {% if form[campo_nome] is defined and campo_nome != 'csrf_token' %}
+                  {{ form[campo_nome].label.text }}: {{ mensagem }}
+                {% else %}
+                  {{ mensagem }}
+                {% endif %}
+              </li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}

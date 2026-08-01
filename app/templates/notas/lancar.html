@@ -1,0 +1,365 @@
+{# ===========================================================================
+   Grade de lancamento de notas.
+
+   Alunos nas linhas, avaliacoes nas colunas. Cada avaliacao tem seu proprio
+   <form>, de modo que o professor grava uma coluna por vez — mais seguro
+   que um unico envio gigante, e permite salvar parcialmente sem perder o
+   trabalho ja feito.
+   =========================================================================== #}
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto %}
+
+{% block titulo %}Notas - {{ vinculo.disciplina.nome if vinculo.disciplina }}{% endblock %}
+{% block titulo_pagina %}Lancamento de notas{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('notas.index') }}">Notas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ vinculo.descricao }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    <span class="sge-ponto" style="background: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }};"></span>
+    {{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}
+    &middot; {{ vinculo.turma.nome_completo if vinculo.turma else '?' }}
+    &middot; {{ vinculo.nome_professor }}
+  </p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.FREQUENCIA_VISUALIZAR) %}
+    <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}" class="btn btn-light">
+      <i class="bi bi-journal-text"></i> Diario
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.NOTA_EDITAR_QUALQUER) and vinculo.turma %}
+    <form method="post" action="{{ url_for('notas.consolidar', turma_id=vinculo.turma_id) }}"
+          class="d-inline"
+          data-confirmar
+          data-confirmar-titulo="Consolidar resultados"
+          data-confirmar-texto="As medias, a frequencia e o resultado de todos os alunos da turma serao recalculados."
+          data-confirmar-botao="Consolidar"
+          data-confirmar-cor="primary">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-light">
+        <i class="bi bi-calculator"></i> Consolidar turma
+      </button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Seletor de periodo --- #}
+  {% if periodos %}
+    <ul class="nav nav-pills mb-3 flex-nowrap overflow-auto pb-1">
+      {% for periodo in periodos %}
+        <li class="nav-item flex-shrink-0">
+          <a class="nav-link {{ 'active' if periodo.id == periodo_id }}"
+             href="{{ url_for('notas.lancar', vinculo_id=vinculo.id, periodo_id=periodo.id) }}">
+            {{ periodo.nome }}
+            {% if periodo.encerrado %}
+              <i class="bi bi-lock-fill small ms-1" data-bs-toggle="tooltip"
+                 title="Periodo encerrado"></i>
+            {% elif periodo.esta_vigente %}
+              <span class="badge text-bg-light ms-1">atual</span>
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Nenhum periodo letivo cadastrado para este ano. Configure os
+        bimestres antes de lancar notas.
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Nova avaliacao --- #}
+  {% if pode_lancar and periodos %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-clipboard-plus text-primary"></i> Nova avaliacao
+        <button class="btn btn-sm btn-primary ms-auto" type="button"
+                data-bs-toggle="collapse" data-bs-target="#formAvaliacao">
+          <i class="bi bi-plus-lg"></i> Criar
+        </button>
+      </div>
+      <div class="collapse" id="formAvaliacao">
+        <div class="card-body border-top" style="background: var(--sge-superficie-alt);">
+          <form method="post" action="{{ url_for('notas.criar_avaliacao', vinculo_id=vinculo.id) }}">
+            {{ form.hidden_tag() }}
+            <div class="row g-3">
+              {{ campo(form.nome, coluna='col-12 col-md-4') }}
+              {{ selecao(form.periodo_id, coluna='col-6 col-md-2') }}
+              {{ selecao(form.tipo, coluna='col-6 col-md-2') }}
+              {{ campo(form.peso, coluna='col-4 col-md-1',
+                       ajuda='Peso na media') }}
+              {{ campo(form.valor_maximo, coluna='col-4 col-md-1',
+                       ajuda='Nota maxima') }}
+              {{ campo(form.data_aplicacao, coluna='col-4 col-md-2') }}
+              {{ area_texto(form.descricao, coluna='col-12', linhas=2) }}
+              <div class="col-12">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-lg"></i> Criar avaliacao
+                </button>
+              </div>
+            </div>
+            <p class="form-text mb-0 mt-2">
+              <i class="bi bi-info-circle me-1"></i>
+              Avaliacoes do tipo <strong>Recuperacao</strong> nao entram na media
+              ponderada: elas substituem a media quando forem maiores.
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Grade de notas --- #}
+  {% if grade.avaliacoes %}
+
+    {# Uma aba por avaliacao: cada uma e um formulario independente. #}
+    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto" role="tablist">
+      {% for avaliacao in grade.avaliacoes %}
+        <li class="nav-item flex-shrink-0" role="presentation">
+          <button class="nav-link {{ 'active' if loop.first }}"
+                  data-bs-toggle="tab" data-bs-target="#av-{{ avaliacao.id }}"
+                  type="button" role="tab">
+            {{ avaliacao.nome }}
+            <span class="badge sge-badge-suave text-bg-{{ avaliacao.tipo.cor }} ms-1">
+              {{ avaliacao.tipo.rotulo }}
+            </span>
+            {% if not avaliacao.publicada %}
+              <i class="bi bi-eye-slash small ms-1" data-bs-toggle="tooltip"
+                 title="Notas nao publicadas"></i>
+            {% endif %}
+          </button>
+        </li>
+      {% endfor %}
+      <li class="nav-item flex-shrink-0" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#resumo-periodo"
+                type="button" role="tab">
+          <i class="bi bi-calculator me-1"></i> Media do periodo
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      {% for avaliacao in grade.avaliacoes %}
+        <div class="tab-pane fade {{ 'show active' if loop.first }}"
+             id="av-{{ avaliacao.id }}" role="tabpanel">
+          <div class="card">
+            <div class="card-header flex-wrap gap-2">
+              <div class="min-w-0">
+                <div>{{ avaliacao.nome }}</div>
+                <div class="small fw-normal sge-texto-fraco">
+                  Peso {{ avaliacao.peso | nota(1) }}
+                  &middot; vale ate {{ avaliacao.valor_maximo | nota(1) }}
+                  {% if avaliacao.data_aplicacao %}
+                    &middot; aplicada em {{ avaliacao.data_aplicacao | data }}
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="ms-auto d-flex flex-wrap gap-2">
+                {% if pode_lancar %}
+                  <form method="post"
+                        action="{{ url_for('notas.publicar_avaliacao', avaliacao_id=avaliacao.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="publicar" value="{{ '0' if avaliacao.publicada else '1' }}">
+                    <button type="submit"
+                            class="btn btn-sm {{ 'btn-outline-secondary' if avaliacao.publicada else 'btn-outline-primary' }}">
+                      <i class="bi bi-{{ 'eye-slash' if avaliacao.publicada else 'eye' }}"></i>
+                      {{ 'Ocultar' if avaliacao.publicada else 'Publicar' }}
+                    </button>
+                  </form>
+
+                  <form method="post"
+                        action="{{ url_for('notas.excluir_avaliacao', avaliacao_id=avaliacao.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Excluir avaliacao"
+                        data-confirmar-texto="A avaliacao {{ avaliacao.nome }} sera excluida. So e possivel excluir avaliacoes sem notas lancadas."
+                        data-confirmar-botao="Excluir">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+
+            <form method="post" action="{{ url_for('notas.salvar_notas', avaliacao_id=avaliacao.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+              <div class="card-body p-0">
+                <div class="sge-tabela-wrapper">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th style="width:44px;" class="text-center">Nº</th>
+                        <th>Aluno</th>
+                        <th style="width:130px;" class="text-center">Nota</th>
+                        <th style="width:110px;" class="text-center">Ausente</th>
+                        <th class="text-center d-none d-md-table-cell" style="width:110px;">
+                          Aproveitamento
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for linha in grade.linhas %}
+                        {# Localiza, entre as celulas do aluno, a desta avaliacao #}
+                        {% set ns = namespace(nota=None) %}
+                        {% for c in linha.celulas %}
+                          {% if c.avaliacao.id == avaliacao.id %}{% set ns.nota = c.nota %}{% endif %}
+                        {% endfor %}
+                        {% set nota = ns.nota %}
+                        <tr>
+                          <td class="text-center sge-texto-fraco small sge-numerico">{{ loop.index }}</td>
+                          <td>
+                            <div class="d-flex align-items-center gap-2">
+                              {% if linha.aluno.foto %}
+                                <img src="{{ url_for('static', filename='uploads/alunos/' ~ linha.aluno.foto) }}"
+                                     alt="" class="sge-avatar sge-avatar--sm">
+                              {% else %}
+                                <span class="sge-avatar sge-avatar--sm">{{ linha.aluno.iniciais }}</span>
+                              {% endif %}
+                              <span class="min-w-0">
+                                <span class="d-block fw-semibold text-truncate small">
+                                  {{ linha.aluno.nome_exibicao }}
+                                </span>
+                                <span class="d-block small sge-texto-fraco sge-numerico">
+                                  {{ linha.aluno.codigo }}
+                                </span>
+                              </span>
+                            </div>
+                          </td>
+                          <td class="text-center">
+                            <input type="text"
+                                   class="form-control form-control-sm sge-nota-input mx-auto"
+                                   name="nota_{{ linha.matricula.id }}"
+                                   value="{{ nota.valor | nota(1) if nota and nota.valor is not none else '' }}"
+                                   inputmode="decimal"
+                                   autocomplete="off"
+                                   data-nota-maxima="{{ avaliacao.valor_maximo }}"
+                                   aria-label="Nota de {{ linha.aluno.nome_exibicao }}"
+                                   {{ 'disabled' if not pode_lancar }}>
+                          </td>
+                          <td class="text-center">
+                            <div class="form-check d-flex justify-content-center">
+                              <input class="form-check-input" type="checkbox"
+                                     name="ausente_{{ linha.matricula.id }}"
+                                     value="1"
+                                     {{ 'checked' if nota and nota.ausente }}
+                                     {{ 'disabled' if not pode_lancar }}
+                                     aria-label="Aluno ausente na avaliacao">
+                            </div>
+                          </td>
+                          <td class="text-center d-none d-md-table-cell small sge-numerico">
+                            {% if nota and nota.percentual is not none %}
+                              <span class="badge sge-badge-suave text-bg-{{ 'success' if nota.percentual >= 60 else 'danger' }}">
+                                {{ nota.percentual | percentual(0) }}
+                              </span>
+                            {% else %}
+                              <span class="sge-texto-fraco">—</span>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {% if pode_lancar %}
+                <div class="card-footer sge-acoes-form">
+                  <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="bi bi-check-lg"></i> Salvar notas de {{ avaliacao.nome }}
+                  </button>
+                </div>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+
+      {# --- Resumo do periodo --- #}
+      <div class="tab-pane fade" id="resumo-periodo" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-calculator text-primary"></i> Media ponderada do periodo
+          </div>
+          <div class="card-body p-0">
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th style="width:44px;" class="text-center">Nº</th>
+                    <th>Aluno</th>
+                    {% for avaliacao in grade.avaliacoes %}
+                      <th class="text-center d-none d-lg-table-cell">
+                        {{ avaliacao.nome | truncar(14, '') }}
+                        <div class="small fw-normal sge-texto-fraco">
+                          peso {{ avaliacao.peso | nota(1) }}
+                        </div>
+                      </th>
+                    {% endfor %}
+                    <th class="text-center">Media</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for linha in grade.linhas %}
+                    <tr>
+                      <td class="text-center sge-texto-fraco small sge-numerico">{{ loop.index }}</td>
+                      <td class="small fw-semibold">{{ linha.aluno.nome_exibicao }}</td>
+                      {% for celula in linha.celulas %}
+                        <td class="text-center d-none d-lg-table-cell sge-numerico small">
+                          {{ celula.nota.valor_exibicao if celula.nota else '—' }}
+                        </td>
+                      {% endfor %}
+                      <td class="text-center">
+                        {% if linha.media is not none %}
+                          <span class="badge sge-badge-suave text-bg-{{ 'success' if linha.media >= 6 else ('warning' if linha.media >= 4 else 'danger') }} sge-numerico">
+                            {{ linha.media | nota }}
+                          </span>
+                        {% else %}
+                          <span class="sge-texto-fraco">—</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  {% elif periodos %}
+    <div class="sge-vazio">
+      <i class="bi bi-clipboard"></i>
+      <h5>Nenhuma avaliacao neste periodo</h5>
+      <p class="mb-0 small">
+        {% if pode_lancar %}
+          Crie a primeira avaliacao usando o botao acima.
+        {% else %}
+          O professor ainda nao criou avaliacoes para este periodo.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/notas.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import selecao, campo %}
+
+{% block titulo %}{{ turma.identificacao_curta }}{% endblock %}
+{% block titulo_pagina %}{{ turma.nome_completo }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('turmas.listar') }}">Turmas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ turma.identificacao_curta }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.TURMA_EDITAR) %}
+    <a href="{{ url_for('turmas.editar', turma_id=turma.id) }}" class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Editar
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.HORARIO_VISUALIZAR) %}
+    <a href="{{ url_for('horarios.da_turma', turma_id=turma.id) }}" class="btn btn-light">
+      <i class="bi bi-clock-history"></i> Horarios
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.MATRICULA_CRIAR) and not turma.esta_lotada %}
+    <a href="{{ url_for('matriculas.nova', turma_id=turma.id) }}" class="btn btn-light">
+      <i class="bi bi-file-earmark-plus"></i> Matricular aluno
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Indicadores --- #}
+  {% set ocupados = turma.contar_matriculas_ativas() %}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--primaria"><i class="bi bi-people"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">
+            {{ ocupados }}<span class="fs-6 sge-texto-fraco">/{{ turma.capacidade }}</span>
+          </div>
+          <div class="sge-indicador__rotulo">Alunos</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--{{ 'perigo' if turma.esta_lotada else 'sucesso' }}">
+          <i class="bi bi-door-open"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">{{ turma.vagas_disponiveis }}</div>
+          <div class="sge-indicador__rotulo">Vagas livres</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--info"><i class="bi bi-book"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">{{ turma.turmas_disciplinas | length }}</div>
+          <div class="sge-indicador__rotulo">Disciplinas</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--neutro"><i class="bi bi-geo-alt"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor" style="font-size:1.05rem;">
+            {{ turma.sala.nome if turma.sala else 'Sem sala' }}
+          </div>
+          <div class="sge-indicador__rotulo">{{ turma.turno.rotulo }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aba-alunos"
+              type="button" role="tab">
+        <i class="bi bi-people me-1"></i> Alunos
+        <span class="badge sge-badge-suave ms-1">{{ matriculas | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-grade"
+              type="button" role="tab">
+        <i class="bi bi-book me-1"></i> Grade de disciplinas
+        <span class="badge sge-badge-suave ms-1">{{ turma.turmas_disciplinas | length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    {# ---------------- Alunos ---------------- #}
+    <div class="tab-pane fade show active" id="aba-alunos" role="tabpanel">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-people text-primary"></i> Alunos matriculados
+          <div class="ms-auto" style="max-width:240px;">
+            <input type="search" class="form-control form-control-sm"
+                   placeholder="Filtrar nesta lista..."
+                   data-filtrar-tabela="tabelaAlunosTurma" aria-label="Filtrar alunos">
+          </div>
+        </div>
+        <div class="card-body p-0">
+          {% if matriculas %}
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle mb-0" id="tabelaAlunosTurma">
+                <thead>
+                  <tr>
+                    <th style="width:48px;" class="text-center">Nº</th>
+                    <th>Aluno</th>
+                    <th class="d-none d-md-table-cell">Matricula</th>
+                    <th class="d-none d-lg-table-cell">Responsavel</th>
+                    <th class="d-none d-lg-table-cell">Contato</th>
+                    <th class="sge-tabela-acoes">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for matricula in matriculas %}
+                    {% set aluno = matricula.aluno %}
+                    <tr>
+                      <td class="text-center sge-numerico sge-texto-fraco small">{{ loop.index }}</td>
+                      <td>
+                        <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}"
+                           class="d-flex align-items-center gap-2 text-reset text-decoration-none">
+                          {% if aluno.foto %}
+                            <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                                 alt="" class="sge-avatar sge-avatar--sm">
+                          {% else %}
+                            <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+                          {% endif %}
+                          <span class="min-w-0">
+                            <span class="d-block fw-semibold text-truncate">{{ aluno.nome_exibicao }}</span>
+                            <span class="d-block small sge-texto-fraco sge-numerico">{{ aluno.codigo }}</span>
+                          </span>
+                        </a>
+                      </td>
+                      <td class="d-none d-md-table-cell small sge-numerico">{{ matricula.numero }}</td>
+                      <td class="d-none d-lg-table-cell small text-truncate" style="max-width:180px;">
+                        {{ aluno.responsavel_principal.nome_completo if aluno.responsavel_principal else '—' }}
+                      </td>
+                      <td class="d-none d-lg-table-cell small sge-numerico">
+                        {{ aluno.responsavel_principal.telefone_formatado if aluno.responsavel_principal else '—' }}
+                      </td>
+                      <td class="sge-tabela-acoes">
+                        <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}"
+                           class="btn btn-sm btn-light sge-btn-icone"
+                           data-bs-toggle="tooltip" title="Ficha do aluno">
+                          <i class="bi bi-eye"></i>
+                        </a>
+                        {% if tem_permissao(Permissao.BOLETIM_VISUALIZAR) %}
+                          <a href="{{ url_for('boletim.do_aluno', aluno_id=aluno.id) }}"
+                             class="btn btn-sm btn-light sge-btn-icone"
+                             data-bs-toggle="tooltip" title="Boletim">
+                            <i class="bi bi-journal-text"></i>
+                          </a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                  <tr data-sem-resultado="1" hidden>
+                    <td colspan="6" class="text-center py-4 sge-texto-fraco">
+                      <i class="bi bi-search me-1"></i> Nenhum aluno corresponde ao filtro.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="sge-vazio">
+              <i class="bi bi-people"></i>
+              <h5>Nenhum aluno matriculado</h5>
+              {% if tem_permissao(Permissao.MATRICULA_CRIAR) %}
+                <a href="{{ url_for('matriculas.nova', turma_id=turma.id) }}" class="btn btn-primary mt-2">
+                  <i class="bi bi-file-earmark-plus"></i> Matricular aluno
+                </a>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- Grade ---------------- #}
+    <div class="tab-pane fade" id="aba-grade" role="tabpanel">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-book text-primary"></i> Disciplinas da turma
+          {% if tem_permissao(Permissao.TURMA_EDITAR) %}
+            <button class="btn btn-sm btn-primary ms-auto" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#formAtribuir">
+              <i class="bi bi-plus-lg"></i> Atribuir disciplina
+            </button>
+          {% endif %}
+        </div>
+
+        {% if tem_permissao(Permissao.TURMA_EDITAR) %}
+          <div class="collapse" id="formAtribuir">
+            <div class="card-body border-bottom" style="background: var(--sge-superficie-alt);">
+              {% if form_disciplina.disciplina_id.choices %}
+                <form method="post" action="{{ url_for('turmas.atribuir_disciplina', turma_id=turma.id) }}">
+                  {{ form_disciplina.hidden_tag() }}
+                  <div class="row g-3 align-items-end">
+                    {{ selecao(form_disciplina.disciplina_id, coluna='col-12 col-md-5') }}
+                    {{ selecao(form_disciplina.professor_id, coluna='col-12 col-md-4') }}
+                    <div class="col-6 col-md-2">
+                      <label class="form-label" for="{{ form_disciplina.carga_horaria_semanal.id }}">
+                        Aulas/sem.
+                      </label>
+                      {{ form_disciplina.carga_horaria_semanal(class="form-control") }}
+                    </div>
+                    <div class="col-6 col-md-1">
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus-lg"></i>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              {% else %}
+                <p class="mb-0 small sge-texto-suave">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Todas as disciplinas ativas ja estao atribuidas a esta turma.
+                  Cadastre novas em <a href="{{ url_for('disciplinas.listar') }}">Disciplinas</a>.
+                </p>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="card-body p-0">
+          {% if turma.turmas_disciplinas %}
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Disciplina</th>
+                    <th>Professor</th>
+                    <th class="text-center">Aulas/sem.</th>
+                    <th class="text-center">Situacao</th>
+                    <th class="sge-tabela-acoes">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for vinculo in turma.turmas_disciplinas %}
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="sge-ponto"
+                                style="background: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }};"></span>
+                          <span class="fw-semibold">{{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}</span>
+                          <span class="small sge-texto-fraco">{{ vinculo.disciplina.codigo if vinculo.disciplina }}</span>
+                        </div>
+                      </td>
+                      <td class="small">
+                        {% if vinculo.professor %}
+                          <a href="{{ url_for('professores.detalhe', professor_id=vinculo.professor.id) }}"
+                             class="text-reset text-decoration-none">
+                            {{ vinculo.professor.nome_exibicao }}
+                          </a>
+                        {% else %}
+                          <span class="badge sge-badge-suave text-bg-warning">Sem professor</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-center sge-numerico">{{ vinculo.carga_horaria_semanal }}</td>
+                      <td class="text-center">
+                        <span class="badge sge-badge-suave text-bg-{{ 'success' if vinculo.ativa else 'secondary' }}">
+                          {{ 'Ativa' if vinculo.ativa else 'Inativa' }}
+                        </span>
+                      </td>
+                      <td class="sge-tabela-acoes">
+                        {% if tem_permissao(Permissao.NOTA_VISUALIZAR) %}
+                          <a href="{{ url_for('notas.lancar', vinculo_id=vinculo.id) }}"
+                             class="btn btn-sm btn-light sge-btn-icone"
+                             data-bs-toggle="tooltip" title="Notas">
+                            <i class="bi bi-pencil-square"></i>
+                          </a>
+                        {% endif %}
+                        {% if tem_permissao(Permissao.FREQUENCIA_VISUALIZAR) %}
+                          <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}"
+                             class="btn btn-sm btn-light sge-btn-icone"
+                             data-bs-toggle="tooltip" title="Diario de classe">
+                            <i class="bi bi-journal-text"></i>
+                          </a>
+                        {% endif %}
+                        {% if tem_permissao(Permissao.TURMA_EDITAR) %}
+                          <form method="post" class="d-inline"
+                                action="{{ url_for('turmas.remover_vinculo', turma_id=turma.id, vinculo_id=vinculo.id) }}"
+                                data-confirmar
+                                data-confirmar-titulo="Remover disciplina"
+                                data-confirmar-texto="A disciplina {{ vinculo.disciplina.nome if vinculo.disciplina }} sera removida da grade desta turma."
+                                data-confirmar-botao="Remover">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                    data-bs-toggle="tooltip" title="Remover da turma">
+                              <i class="bi bi-x-lg"></i>
+                            </button>
+                          </form>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="sge-vazio">
+              <i class="bi bi-book"></i>
+              <h5>Nenhuma disciplina atribuida</h5>
+              <p class="mb-0 small">
+                Atribua disciplinas para habilitar diario de classe, notas e horarios.
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Zona de risco --- #}
+  {% if tem_permissao(Permissao.TURMA_EXCLUIR) %}
+    <div class="card mt-4 border-danger-subtle">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="min-w-0">
+          <h6 class="mb-1 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Excluir turma</h6>
+          <p class="small sge-texto-suave mb-0">
+            So e possivel excluir turmas sem alunos matriculados.
+          </p>
+        </div>
+        <form method="post" action="{{ url_for('turmas.excluir', turma_id=turma.id) }}"
+              data-confirmar
+              data-confirmar-titulo="Excluir turma"
+              data-confirmar-texto="A turma {{ turma.nome_completo }} sera marcada como excluida."
+              data-confirmar-botao="Excluir turma">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> Excluir
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

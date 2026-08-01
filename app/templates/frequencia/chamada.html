@@ -1,0 +1,177 @@
+{# ===========================================================================
+   Tela de chamada.
+
+   Otimizada para uso em tablet e celular: o professor faz a chamada em pe,
+   em sala de aula. Cada aluno ocupa uma linha com botoes grandes de
+   presenca/falta, e nao um <select> pequeno.
+   =========================================================================== #}
+{% extends 'base.html' %}
+
+{% block titulo %}Chamada - {{ aula.data_aula | data }}{% endblock %}
+{% block titulo_pagina %}Chamada{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('frequencia.index') }}">Diario de classe</a></li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}">{{ vinculo.descricao }}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ aula.data_aula | data }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    {{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}
+    &middot; {{ vinculo.turma.nome_completo if vinculo.turma else '?' }}
+    &middot; {{ aula.data_aula | data_extenso }}
+  </p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if aula.conteudo %}
+    <div class="card mb-3">
+      <div class="card-body py-2">
+        <div class="small sge-texto-suave">
+          <i class="bi bi-journal-text me-1"></i>
+          <strong>Conteudo:</strong> {{ aula.conteudo }}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if not pode_lancar %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-eye-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Voce esta visualizando a chamada. Apenas o professor titular da
+        disciplina (ou a direcao) pode alterar os lancamentos.
+      </div>
+    </div>
+  {% endif %}
+
+  {% if linhas %}
+    <form method="post" id="formChamada">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {# --- Acoes em lote --- #}
+      {% if pode_lancar %}
+        <div class="card mb-3">
+          <div class="card-body d-flex flex-wrap align-items-center gap-2">
+            <span class="small fw-semibold me-2">Marcar todos como:</span>
+            <button type="button" class="btn btn-sm btn-outline-success"
+                    data-marcar-todos="presente">
+              <i class="bi bi-check-lg"></i> Presente
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    data-marcar-todos="falta">
+              <i class="bi bi-x-lg"></i> Falta
+            </button>
+            <div class="ms-auto small sge-texto-suave">
+              <span class="badge sge-badge-suave text-bg-success">
+                <span data-contador="presente">0</span> presentes
+              </span>
+              <span class="badge sge-badge-suave text-bg-danger">
+                <span data-contador="falta">0</span> faltas
+              </span>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {# --- Lista de alunos --- #}
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-people text-primary"></i> Alunos
+          <span class="badge sge-badge-suave ms-2 sge-numerico">{{ linhas | length }}</span>
+        </div>
+        <div class="card-body">
+          {% for linha in linhas %}
+            {% set aluno = linha.aluno %}
+            {% set matricula = linha.matricula %}
+            <div class="sge-chamada-linha" data-linha-chamada>
+              <span class="sge-texto-fraco small sge-numerico" style="width:22px;">
+                {{ loop.index }}
+              </span>
+
+              {% if aluno.foto %}
+                <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                     alt="" class="sge-avatar sge-avatar--sm">
+              {% else %}
+                <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+              {% endif %}
+
+              <div class="min-w-0 flex-grow-1">
+                <div class="fw-semibold text-truncate small">{{ aluno.nome_exibicao }}</div>
+                <div class="small sge-texto-fraco sge-numerico">{{ aluno.codigo }}</div>
+              </div>
+
+              {# Grupo de botoes de radio estilizados: alvo de toque grande #}
+              <div class="btn-group btn-group-sm flex-shrink-0" role="group"
+                   aria-label="Presenca de {{ aluno.nome_exibicao }}">
+                {% for valor, rotulo, icone, cor in [
+                     ('presente', 'P', 'bi-check-lg', 'success'),
+                     ('falta', 'F', 'bi-x-lg', 'danger'),
+                     ('atraso', 'A', 'bi-clock', 'info'),
+                     ('falta_justificada', 'J', 'bi-file-text', 'warning')
+                   ] %}
+                  <input type="radio" class="btn-check"
+                         name="situacao_{{ matricula.id }}"
+                         id="sit_{{ matricula.id }}_{{ valor }}"
+                         value="{{ valor }}"
+                         {{ 'checked' if linha.situacao == valor }}
+                         {{ 'disabled' if not pode_lancar }}
+                         data-situacao="{{ valor }}">
+                  <label class="btn btn-outline-{{ cor }}" for="sit_{{ matricula.id }}_{{ valor }}"
+                         data-bs-toggle="tooltip"
+                         title="{{ {'presente':'Presente','falta':'Falta','atraso':'Atraso','falta_justificada':'Falta justificada'}[valor] }}">
+                    <i class="bi {{ icone }}"></i>
+                    <span class="d-none d-sm-inline ms-1">{{ rotulo }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            {# Justificativa: visivel apenas quando a situacao exige #}
+            <div class="mb-2 ps-5 {{ '' if linha.situacao == 'falta_justificada' else 'd-none' }}"
+                 data-justificativa-de="{{ matricula.id }}">
+              <input type="text" class="form-control form-control-sm"
+                     name="justificativa_{{ matricula.id }}"
+                     value="{{ linha.justificativa or '' }}"
+                     maxlength="255"
+                     placeholder="Motivo da justificativa (ex.: atestado medico)"
+                     {{ 'disabled' if not pode_lancar }}
+                     aria-label="Justificativa de {{ aluno.nome_exibicao }}">
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if pode_lancar %}
+          <div class="card-footer sge-acoes-form">
+            <button type="submit" class="btn btn-primary flex-grow-1">
+              <i class="bi bi-check-lg"></i> Salvar chamada
+            </button>
+            <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}"
+               class="btn btn-light">Cancelar</a>
+          </div>
+        {% endif %}
+      </div>
+    </form>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-people"></i>
+      <h5>Nenhum aluno matriculado</h5>
+      <p class="mb-0">
+        Esta turma nao possui alunos com matricula ativa.
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/chamada.js') }}"></script>
+{% endblock %}

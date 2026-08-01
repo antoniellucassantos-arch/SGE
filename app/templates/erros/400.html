@@ -1,0 +1,11 @@
+{% extends 'erros/base_erro.html' %}
+{% block titulo %}Requisicao invalida{% endblock %}
+{% block cor_icone %}sge-icone--alerta{% endblock %}
+{% block icone %}bi-exclamation-triangle{% endblock %}
+{% block codigo %}400{% endblock %}
+{% block cabecalho %}Requisicao invalida{% endblock %}
+{% block descricao %}
+  Os dados enviados nao puderam ser processados. Isso costuma acontecer
+  quando o formulario fica aberto por muito tempo. Recarregue a pagina e
+  tente novamente.
+{% endblock %}

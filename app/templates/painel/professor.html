@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% from 'componentes/indicador.html' import indicador, indicador_alerta %}
+
+{% block titulo %}Painel{% endblock %}
+{% block titulo_pagina %}Meu painel{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    Ola, {{ current_user.primeiro_nome }}. Aqui estao suas turmas e pendencias
+    {% if ano_letivo_atual %}de {{ ano_letivo_atual.ano }}{% endif %}.
+  </p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Indicadores                                                        #}
+  {# ------------------------------------------------------------------ #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      {{ indicador('Turmas', dados.total_turmas, 'bi-diagram-3-fill', 'primaria') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Alunos', dados.total_alunos, 'bi-people-fill', 'sucesso') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador_alerta('Chamadas pendentes',
+                          dados.chamadas_pendentes | length,
+                          'bi-calendar-x',
+                          url_for('frequencia.index'),
+                          'alerta' if dados.chamadas_pendentes else 'neutro') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador_alerta('Notas a lancar',
+                          dados.notas_pendentes,
+                          'bi-pencil-square',
+                          url_for('notas.index'),
+                          'perigo' if dados.notas_pendentes else 'neutro') }}
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    {# ---------------------------------------------------------------- #}
+    {# Aulas de hoje                                                    #}
+    {# ---------------------------------------------------------------- #}
+    <div class="col-12 col-xl-5">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-calendar-day text-primary"></i>
+          Aulas de hoje
+          <span class="ms-auto small fw-normal sge-texto-fraco">
+            {{ hoje | data }}
+          </span>
+        </div>
+        <div class="card-body">
+          {% if dados.aulas_hoje %}
+            <div class="d-flex flex-column gap-2">
+              {% for aula in dados.aulas_hoje %}
+                <a href="{{ url_for('frequencia.chamada', aula_id=aula.id) }}"
+                   class="d-flex align-items-center gap-3 p-2 rounded text-reset text-decoration-none border">
+                  <div class="sge-indicador__icone sge-icone--{{ 'sucesso' if aula.chamada_realizada else 'alerta' }}"
+                       style="width:38px;height:38px;font-size:1rem;">
+                    <i class="bi bi-{{ 'check-lg' if aula.chamada_realizada else 'clock' }}"></i>
+                  </div>
+                  <div class="min-w-0 flex-grow-1">
+                    <div class="small fw-semibold text-truncate">
+                      {{ aula.turma_disciplina.disciplina.nome if aula.turma_disciplina.disciplina else '?' }}
+                    </div>
+                    <div class="small sge-texto-fraco">
+                      {{ aula.turma_disciplina.turma.identificacao_curta if aula.turma_disciplina.turma else '?' }}
+                    </div>
+                  </div>
+                  <span class="badge sge-badge-suave text-bg-{{ 'success' if aula.chamada_realizada else 'warning' }}">
+                    {{ 'Chamada feita' if aula.chamada_realizada else 'Pendente' }}
+                  </span>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="sge-vazio py-4">
+              <i class="bi bi-calendar-check"></i>
+              <p class="mb-0 small">Nenhuma aula registrada para hoje.</p>
+            </div>
+          {% endif %}
+        </div>
+        <div class="card-footer">
+          <a href="{{ url_for('frequencia.index') }}" class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-journal-plus"></i> Abrir diario de classe
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {# ---------------------------------------------------------------- #}
+    {# Minhas turmas                                                    #}
+    {# ---------------------------------------------------------------- #}
+    <div class="col-12 col-xl-7">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-grid text-primary"></i>
+          Minhas turmas e disciplinas
+        </div>
+        <div class="card-body p-0">
+          {% if dados.vinculos %}
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Disciplina</th>
+                    <th>Turma</th>
+                    <th class="text-center">Aulas/sem.</th>
+                    <th class="sge-tabela-acoes">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for vinculo in dados.vinculos %}
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="sge-ponto"
+                                style="background: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }};"></span>
+                          <span class="fw-semibold">
+                            {{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}
+                          </span>
+                        </div>
+                      </td>
+                      <td>{{ vinculo.turma.nome_completo if vinculo.turma else '?' }}</td>
+                      <td class="text-center sge-numerico">{{ vinculo.carga_horaria_semanal }}</td>
+                      <td class="sge-tabela-acoes">
+                        <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}"
+                           class="btn btn-sm btn-light sge-btn-icone"
+                           data-bs-toggle="tooltip" title="Diario de classe">
+                          <i class="bi bi-journal-text"></i>
+                        </a>
+                        <a href="{{ url_for('notas.lancar', vinculo_id=vinculo.id) }}"
+                           class="btn btn-sm btn-light sge-btn-icone"
+                           data-bs-toggle="tooltip" title="Lancar notas">
+                          <i class="bi bi-pencil-square"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="sge-vazio">
+              <i class="bi bi-inbox"></i>
+              <h5>Nenhuma turma atribuida</h5>
+              <p class="mb-0 small">
+                Voce ainda nao possui disciplinas atribuidas neste ano letivo.
+                Procure a coordenacao.
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Chamadas pendentes                                                 #}
+  {# ------------------------------------------------------------------ #}
+  {% if dados.chamadas_pendentes %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <i class="bi bi-exclamation-triangle text-warning"></i>
+        Chamadas pendentes
+        <span class="badge text-bg-warning ms-2">{{ dados.chamadas_pendentes | length }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Disciplina</th>
+                <th>Turma</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for aula in dados.chamadas_pendentes %}
+                <tr>
+                  <td class="sge-numerico">{{ aula.data_aula | data }}</td>
+                  <td>{{ aula.turma_disciplina.disciplina.nome if aula.turma_disciplina.disciplina else '?' }}</td>
+                  <td>{{ aula.turma_disciplina.turma.identificacao_curta if aula.turma_disciplina.turma else '?' }}</td>
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('frequencia.chamada', aula_id=aula.id) }}"
+                       class="btn btn-sm btn-primary">
+                      <i class="bi bi-check2-square"></i> Fazer chamada
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

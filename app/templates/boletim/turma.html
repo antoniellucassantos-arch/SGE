@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Ata - {{ turma.identificacao_curta }}{% endblock %}
+{% block titulo_pagina %}Ata de resultados{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('boletim.index') }}">Boletins</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ turma.identificacao_curta }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>{{ turma.nome_completo }} &middot; {{ boletins | length }} aluno(s)</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.BOLETIM_EMITIR) %}
+    <a href="{{ url_for('boletim.pdf_turma', turma_id=turma.id) }}"
+       class="btn btn-primary" target="_blank" rel="noopener">
+      <i class="bi bi-file-earmark-pdf"></i> Boletins em PDF
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.NOTA_EDITAR_QUALQUER) %}
+    <form method="post" action="{{ url_for('notas.consolidar', turma_id=turma.id) }}"
+          class="d-inline"
+          data-confirmar
+          data-confirmar-titulo="Consolidar resultados"
+          data-confirmar-texto="As medias, a frequencia e o resultado de todos os alunos serao recalculados."
+          data-confirmar-botao="Consolidar"
+          data-confirmar-cor="primary">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-light">
+        <i class="bi bi-calculator"></i> Consolidar
+      </button>
+    </form>
+  {% endif %}
+  <button type="button" class="btn btn-light" data-imprimir>
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if boletins %}
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-table text-primary"></i> Resultados consolidados
+        <div class="ms-auto sge-nao-imprimir" style="max-width:240px;">
+          <input type="search" class="form-control form-control-sm"
+                 placeholder="Filtrar aluno..."
+                 data-filtrar-tabela="tabelaAta" aria-label="Filtrar alunos">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0" id="tabelaAta">
+            <thead>
+              <tr>
+                <th style="width:44px;" class="text-center">Nº</th>
+                <th>Aluno</th>
+                {% for linha in boletins[0].linhas %}
+                  <th class="text-center d-none d-lg-table-cell"
+                      style="writing-mode: vertical-rl; transform: rotate(180deg); height:120px;">
+                    {{ linha.disciplina.nome if linha.disciplina else '?' }}
+                  </th>
+                {% endfor %}
+                <th class="text-center">Media</th>
+                <th class="text-center d-none d-md-table-cell">Freq.</th>
+                <th class="text-center">Resultado</th>
+                <th class="sge-tabela-acoes sge-nao-imprimir">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for boletim in boletins %}
+                {% set matricula = boletim.matricula %}
+                <tr>
+                  <td class="text-center sge-texto-fraco small sge-numerico">{{ loop.index }}</td>
+                  <td>
+                    <a href="{{ url_for('boletim.do_aluno', aluno_id=boletim.aluno.id) }}"
+                       class="fw-semibold text-reset text-decoration-none small">
+                      {{ boletim.aluno.nome_exibicao }}
+                    </a>
+                  </td>
+
+                  {% for linha in boletim.linhas %}
+                    <td class="text-center d-none d-lg-table-cell sge-numerico small">
+                      {% if linha.media_final is not none %}
+                        <span class="{{ 'text-danger fw-semibold' if linha.media_final < 6 }}">
+                          {{ linha.media_final | nota }}
+                        </span>
+                      {% else %}
+                        <span class="sge-texto-fraco">—</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+
+                  <td class="text-center">
+                    {% if boletim.media_geral is not none %}
+                      <span class="badge sge-badge-suave text-bg-{{ 'success' if boletim.media_geral >= 6 else 'danger' }} sge-numerico">
+                        {{ boletim.media_geral | nota }}
+                      </span>
+                    {% else %}
+                      <span class="sge-texto-fraco">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center d-none d-md-table-cell sge-numerico small">
+                    {% if boletim.frequencia_geral is not none %}
+                      <span class="{{ 'text-danger fw-semibold' if boletim.frequencia_geral < 75 }}">
+                        {{ boletim.frequencia_geral | percentual(0) }}
+                      </span>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="text-center">
+                    <span class="badge sge-badge-suave text-bg-{{ matricula.resultado_final.cor }}">
+                      {{ matricula.resultado_final.rotulo }}
+                    </span>
+                  </td>
+                  <td class="sge-tabela-acoes sge-nao-imprimir">
+                    <a href="{{ url_for('boletim.do_aluno', aluno_id=boletim.aluno.id) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Boletim individual">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+              <tr data-sem-resultado="1" hidden>
+                <td colspan="99" class="text-center py-4 sge-texto-fraco">
+                  <i class="bi bi-search me-1"></i> Nenhum aluno corresponde ao filtro.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer small sge-texto-suave">
+        <i class="bi bi-info-circle me-1"></i>
+        As colunas por disciplina aparecem em telas largas. Em celulares,
+        consulte o boletim individual de cada aluno.
+      </div>
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-people"></i>
+      <h5>Nenhum aluno matriculado</h5>
+      <p class="mb-0">Esta turma nao possui alunos com matricula ativa.</p>
+    </div>
+  {% endif %}
+
+{% endblock %}

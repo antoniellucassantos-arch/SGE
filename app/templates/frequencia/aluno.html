@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% from 'componentes/indicador.html' import indicador %}
+
+{% block titulo %}Frequencia - {{ aluno.nome_exibicao }}{% endblock %}
+{% block titulo_pagina %}Frequencia{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      {% if tem_permissao(Permissao.ALUNO_VISUALIZAR) and current_user.e_equipe_interna %}
+        <li class="breadcrumb-item"><a href="{{ url_for('alunos.listar') }}">Alunos</a></li>
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}">{{ aluno.nome_exibicao }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">Frequencia</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    {{ aluno.nome_exibicao }}
+    {% if matricula and matricula.turma %}
+      &middot; {{ matricula.turma.nome_completo }}
+    {% endif %}
+  </p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if not matricula %}
+    <div class="sge-vazio">
+      <i class="bi bi-calendar-x"></i>
+      <h5>Sem matricula ativa</h5>
+      <p class="mb-0">
+        Nao ha frequencia a exibir porque o aluno nao possui matricula ativa
+        no ano letivo corrente.
+      </p>
+    </div>
+  {% else %}
+
+    {# --- Indicadores gerais --- #}
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-3">
+        {{ indicador('Aulas dadas', resumo.total_aulas, 'bi-journal', 'info') }}
+      </div>
+      <div class="col-6 col-lg-3">
+        {{ indicador('Presencas', resumo.total_presencas, 'bi-check-circle-fill', 'sucesso') }}
+      </div>
+      <div class="col-6 col-lg-3">
+        {{ indicador('Faltas', resumo.total_faltas, 'bi-x-circle-fill',
+                     'perigo' if resumo.total_faltas > 10 else 'neutro') }}
+      </div>
+      <div class="col-6 col-lg-3">
+        {{ indicador('Frequencia',
+                     resumo.percentual | percentual if resumo.percentual is not none else '—',
+                     'bi-calendar-check-fill',
+                     'sucesso' if (resumo.percentual or 100) >= 75 else 'perigo') }}
+      </div>
+    </div>
+
+    {% if resumo.percentual is not none and resumo.percentual < 75 %}
+      <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-octagon-fill flex-shrink-0"></i>
+        <div class="flex-grow-1">
+          <strong>Frequencia abaixo do minimo legal.</strong>
+          A LDB exige 75% de frequencia para aprovacao. A situacao atual e de
+          {{ resumo.percentual | percentual }}.
+        </div>
+      </div>
+    {% endif %}
+
+    {# --- Frequencia por disciplina --- #}
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-list-columns text-primary"></i> Frequencia por disciplina
+      </div>
+      <div class="card-body p-0">
+        {% if disciplinas %}
+          <div class="sge-tabela-wrapper">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Disciplina</th>
+                  <th class="text-center">Aulas</th>
+                  <th class="text-center">Faltas</th>
+                  <th style="min-width:160px;">Frequencia</th>
+                  <th class="text-center d-none d-md-table-cell">Situacao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in disciplinas %}
+                  {% set pct = item.percentual %}
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="sge-ponto"
+                              style="background: {{ item.disciplina.cor if item.disciplina else '#6c757d' }};"></span>
+                        <span class="fw-semibold">
+                          {{ item.disciplina.nome if item.disciplina else '?' }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="text-center sge-numerico">{{ item.total_aulas }}</td>
+                    <td class="text-center sge-numerico {{ 'text-danger fw-semibold' if item.total_faltas > 5 }}">
+                      {{ item.total_faltas }}
+                    </td>
+                    <td>
+                      {% if pct is not none %}
+                        <div class="d-flex align-items-center gap-2">
+                          <div class="progress flex-grow-1" style="min-width:60px;"
+                               role="progressbar" aria-label="Frequencia"
+                               aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar bg-{{ 'success' if pct >= 75 else ('warning' if pct >= 60 else 'danger') }}"
+                                 style="width: {{ pct }}%"></div>
+                          </div>
+                          <span class="small sge-numerico text-nowrap">{{ pct | percentual }}</span>
+                        </div>
+                      {% else %}
+                        <span class="sge-texto-fraco small">Sem aulas registradas</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center d-none d-md-table-cell">
+                      {% if pct is none %}
+                        <span class="badge sge-badge-suave">—</span>
+                      {% elif pct >= 75 %}
+                        <span class="badge sge-badge-suave text-bg-success">Regular</span>
+                      {% else %}
+                        <span class="badge sge-badge-suave text-bg-danger">Em risco</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="sge-vazio">
+            <i class="bi bi-calendar"></i>
+            <h5>Nenhuma aula registrada</h5>
+            <p class="mb-0 small">
+              A frequencia aparece aqui conforme os professores lancam as chamadas.
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  {% endif %}
+{% endblock %}

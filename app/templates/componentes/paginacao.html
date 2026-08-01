@@ -1,0 +1,95 @@
+{# ===========================================================================
+   Paginacao reutilizavel.
+
+   Preserva todos os filtros da URL ao trocar de pagina: perder a busca ao
+   paginar e um dos defeitos mais irritantes em sistemas administrativos.
+
+   Uso:
+     {% from 'componentes/paginacao.html' import paginacao %}
+     {{ paginacao(pagina, 'alunos.listar', parametros) }}
+   =========================================================================== #}
+
+{% macro paginacao(pagina, endpoint, parametros={}, rotulo='registros') %}
+  {% if pagina and pagina.pages > 1 %}
+    <nav aria-label="Navegacao de paginas" class="mt-3">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+
+        <div class="small sge-texto-suave order-2 order-sm-1">
+          Exibindo
+          <strong class="sge-numerico">{{ pagina.items | length }}</strong>
+          de
+          <strong class="sge-numerico">{{ pagina.total }}</strong>
+          {{ rotulo }}
+          &middot; pagina {{ pagina.page }} de {{ pagina.pages }}
+        </div>
+
+        <ul class="pagination pagination-sm mb-0 order-1 order-sm-2 flex-wrap">
+          {# --- Anterior --- #}
+          <li class="page-item {% if not pagina.has_prev %}disabled{% endif %}">
+            <a class="page-link"
+               href="{{ url_for(endpoint, pagina=pagina.prev_num, **parametros) if pagina.has_prev else '#' }}"
+               aria-label="Pagina anterior" {% if not pagina.has_prev %}tabindex="-1"{% endif %}>
+              <i class="bi bi-chevron-left"></i>
+            </a>
+          </li>
+
+          {# --- Numeros (janela deslizante) --- #}
+          {% for numero in pagina.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+            {% if numero %}
+              <li class="page-item {% if numero == pagina.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for(endpoint, pagina=numero, **parametros) }}"
+                   {% if numero == pagina.page %}aria-current="page"{% endif %}>
+                  {{ numero }}
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+          {% endfor %}
+
+          {# --- Proxima --- #}
+          <li class="page-item {% if not pagina.has_next %}disabled{% endif %}">
+            <a class="page-link"
+               href="{{ url_for(endpoint, pagina=pagina.next_num, **parametros) if pagina.has_next else '#' }}"
+               aria-label="Proxima pagina" {% if not pagina.has_next %}tabindex="-1"{% endif %}>
+              <i class="bi bi-chevron-right"></i>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  {% elif pagina and pagina.total %}
+    <div class="small sge-texto-suave mt-3">
+      <strong class="sge-numerico">{{ pagina.total }}</strong> {{ rotulo }}.
+    </div>
+  {% endif %}
+{% endmacro %}
+
+
+{# --- Cabecalho de coluna ordenavel --- #}
+{% macro coluna_ordenavel(rotulo, chave, endpoint, ordenacao, parametros={}, classe='') %}
+  {% set ativa = ordenacao.coluna == chave %}
+  {% set proxima = 'desc' if (ativa and ordenacao.direcao == 'asc') else 'asc' %}
+  <th class="{{ classe }}">
+    <a href="{{ url_for(endpoint, ordenar=chave, direcao=proxima, **parametros) }}"
+       class="text-reset text-decoration-none d-inline-flex align-items-center gap-1">
+      {{ rotulo }}
+      {% if ativa %}
+        <i class="bi bi-caret-{{ 'up' if ordenacao.direcao == 'asc' else 'down' }}-fill small"></i>
+      {% else %}
+        <i class="bi bi-arrow-down-up small opacity-25"></i>
+      {% endif %}
+    </a>
+  </th>
+{% endmacro %}
+
+
+{# --- Linha exibida quando o filtro instantaneo nao encontra nada --- #}
+{% macro linha_sem_resultado(colunas) %}
+  <tr data-sem-resultado="1" hidden>
+    <td colspan="{{ colunas }}" class="text-center py-4 sge-texto-fraco">
+      <i class="bi bi-search me-1"></i>
+      Nenhum registro corresponde ao filtro digitado.
+    </td>
+  </tr>
+{% endmacro %}

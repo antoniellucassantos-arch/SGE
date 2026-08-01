@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, caixa, arquivo, resumo_erros %}
+
+{% block titulo %}{{ 'Editar aluno' if aluno else 'Novo aluno' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar aluno' if aluno else 'Novo aluno' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('alunos.listar') }}">Alunos</a></li>
+      {% if aluno %}
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}">{{ aluno.nome_exibicao }}</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">Editar</li>
+      {% else %}
+        <li class="breadcrumb-item active" aria-current="page">Novo</li>
+      {% endif %}
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    {% if aluno %}
+      Codigo {{ aluno.codigo }} &middot; cadastrado em {{ aluno.criado_em | data }}
+    {% else %}
+      O codigo do aluno (RA) e gerado automaticamente ao salvar.
+    {% endif %}
+  </p>
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" enctype="multipart/form-data" novalidate data-avisar-saida>
+  {{ form.hidden_tag() }}
+  {{ resumo_erros(form) }}
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+
+      {# ------------------------------------------------------------ #}
+      {# Dados pessoais                                               #}
+      {# ------------------------------------------------------------ #}
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person text-primary"></i> Dados pessoais</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.nome_completo, coluna='col-12') }}
+            {{ campo(form.nome_social, coluna='col-12 col-md-6',
+                     ajuda='Preencher apenas se o aluno utiliza nome social.') }}
+            {{ campo(form.data_nascimento, coluna='col-6 col-md-3') }}
+            {{ selecao(form.sexo, coluna='col-6 col-md-3') }}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-card-text"></i> Documentos
+            </div>
+            <div class="row g-3">
+              {{ campo(form.cpf, coluna='col-12 col-md-4', mascara='cpf') }}
+              {{ campo(form.rg, coluna='col-6 col-md-4') }}
+              {{ campo(form.rg_orgao_emissor, coluna='col-6 col-md-4') }}
+              {{ campo(form.certidao_nascimento, coluna='col-12 col-md-6') }}
+              {{ campo(form.nis, coluna='col-6 col-md-3',
+                       ajuda='Programas sociais') }}
+              {{ campo(form.cartao_sus, coluna='col-6 col-md-3') }}
+            </div>
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-geo"></i> Naturalidade
+            </div>
+            <div class="row g-3">
+              {{ campo(form.naturalidade, coluna='col-12 col-md-5') }}
+              {{ selecao(form.uf_naturalidade, coluna='col-4 col-md-3') }}
+              {{ campo(form.nacionalidade, coluna='col-8 col-md-4') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ------------------------------------------------------------ #}
+      {# Contato e endereco                                           #}
+      {# ------------------------------------------------------------ #}
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-telephone text-primary"></i> Contato e endereco</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.celular, coluna='col-12 col-md-4', mascara='telefone') }}
+            {{ campo(form.telefone, coluna='col-12 col-md-4', mascara='telefone') }}
+            {{ campo(form.email, coluna='col-12 col-md-4') }}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-house"></i> Endereco residencial
+            </div>
+            <div class="row g-3">
+              {{ campo(form.cep, coluna='col-6 col-md-3', mascara='cep') }}
+              {{ campo(form.logradouro, coluna='col-12 col-md-6') }}
+              {{ campo(form.numero, coluna='col-6 col-md-3') }}
+              {{ campo(form.complemento, coluna='col-12 col-md-4') }}
+              {{ campo(form.bairro, coluna='col-12 col-md-4') }}
+              {{ campo(form.cidade, coluna='col-8 col-md-3') }}
+              {{ selecao(form.uf, coluna='col-4 col-md-1') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ------------------------------------------------------------ #}
+      {# Saude                                                        #}
+      {# ------------------------------------------------------------ #}
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-heart-pulse text-primary"></i> Informacoes de saude
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info mb-3" role="alert">
+            <i class="bi bi-shield-lock-fill flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+              Dados sensiveis protegidos pela LGPD. Sao coletados para
+              garantir o atendimento adequado ao aluno e ficam visiveis
+              apenas para a equipe autorizada da escola.
+            </div>
+          </div>
+
+          <div class="row g-3">
+            {{ selecao(form.tipo_sanguineo, coluna='col-6 col-md-3') }}
+            {{ area_texto(form.alergias, coluna='col-12 col-md-9', linhas=2) }}
+            {{ area_texto(form.medicamentos_continuos, coluna='col-12 col-md-6', linhas=2) }}
+            {{ area_texto(form.condicoes_saude, coluna='col-12 col-md-6', linhas=2) }}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="row g-3">
+              {{ caixa(form.possui_deficiencia, coluna='col-12 col-md-6') }}
+              {{ caixa(form.necessita_acompanhante, coluna='col-12 col-md-6') }}
+              {{ area_texto(form.descricao_deficiencia, coluna='col-12', linhas=2) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ------------------------------------------------------------ #}
+      {# Beneficios e autorizacoes                                    #}
+      {# ------------------------------------------------------------ #}
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-check2-square text-primary"></i> Beneficios e autorizacoes
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ caixa(form.bolsista, coluna='col-12 col-md-6') }}
+            {{ campo(form.percentual_bolsa, coluna='col-6 col-md-3') }}
+          </div>
+          <div class="sge-secao-form">
+            <div class="row g-3">
+              {{ caixa(form.usa_transporte_escolar, coluna='col-12 col-md-6') }}
+              {{ caixa(form.autorizado_sair_sozinho, coluna='col-12 col-md-6') }}
+              {{ caixa(form.autoriza_uso_imagem, coluna='col-12',
+                       ajuda='Consentimento previsto na LGPD para publicacao de fotos e videos.') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# -------------------------------------------------------------- #}
+    {# Coluna lateral                                                 #}
+    {# -------------------------------------------------------------- #}
+    <div class="col-12 col-xl-4">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-image text-primary"></i> Foto</div>
+        <div class="card-body text-center">
+          {% if aluno and aluno.foto %}
+            <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                 alt="Foto de {{ aluno.nome_exibicao }}"
+                 class="sge-avatar sge-avatar--lg mb-3">
+          {% else %}
+            <div class="sge-avatar sge-avatar--lg mx-auto mb-3">
+              <i class="bi bi-person"></i>
+            </div>
+          {% endif %}
+
+          {{ form.foto(class="form-control" + (" is-invalid" if form.foto.errors else "")) }}
+          {% if form.foto.errors %}
+            <div class="invalid-feedback d-block text-start">{{ form.foto.errors[0] }}</div>
+          {% endif %}
+          <div class="form-text text-start mt-2">
+            PNG, JPG ou WEBP. A imagem e recortada em formato quadrado e
+            os metadados (inclusive localizacao) sao removidos.
+          </div>
+        </div>
+        {% if aluno and aluno.foto %}
+          <div class="card-footer">
+            <button type="button" class="btn btn-sm btn-light w-100 text-danger"
+                    data-confirmar
+                    data-confirmar-titulo="Remover foto"
+                    data-confirmar-texto="A foto atual sera excluida definitivamente."
+                    data-confirmar-botao="Remover"
+                    formaction="{{ url_for('alunos.remover_foto', aluno_id=aluno.id) }}"
+                    formmethod="post">
+              <i class="bi bi-trash"></i> Remover foto
+            </button>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-info-circle text-primary"></i> Situacao</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.situacao, coluna='col-12') }}
+            {{ area_texto(form.observacoes, coluna='col-12', linhas=4) }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar aluno
+          </button>
+          <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) if aluno else url_for('alunos.listar') }}"
+             class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

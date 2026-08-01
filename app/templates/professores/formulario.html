@@ -1,0 +1,42 @@
+{% extends 'pessoas/formulario_base.html' %}
+{% from 'componentes/campo.html' import campo, selecao %}
+
+{% block campos_especificos %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-mortarboard text-primary"></i> Dados funcionais e formacao
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ campo(form.registro_funcional, coluna='col-12 col-md-4',
+                 ajuda='Deixe em branco para gerar automaticamente.') }}
+        {{ campo(form.data_admissao, coluna='col-6 col-md-4') }}
+        {{ campo(form.carga_horaria_semanal, coluna='col-6 col-md-4',
+                 ajuda='Carga contratual em horas.') }}
+      </div>
+
+      <div class="sge-secao-form">
+        <div class="sge-secao-form__titulo">
+          <i class="bi bi-award"></i> Formacao academica
+        </div>
+        <div class="row g-3">
+          {{ campo(form.formacao, coluna='col-12 col-md-6') }}
+          {{ selecao(form.titulacao, coluna='col-12 col-md-3') }}
+          {{ campo(form.instituicao_formacao, coluna='col-12 col-md-3') }}
+        </div>
+      </div>
+
+      {% if registro %}
+        <div class="sge-secao-form">
+          <div class="sge-secao-form__titulo">
+            <i class="bi bi-box-arrow-right"></i> Desligamento
+          </div>
+          <div class="row g-3">
+            {{ campo(form.data_desligamento, coluna='col-6 col-md-4',
+                     ajuda='Preencher apenas em caso de desligamento.') }}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

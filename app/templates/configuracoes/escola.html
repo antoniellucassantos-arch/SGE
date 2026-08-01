@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, resumo_erros %}
+
+{% block titulo %}Configuracoes{% endblock %}
+{% block titulo_pagina %}Configuracoes{% endblock %}
+
+{% block subtitulo %}
+  <p>Dados institucionais usados em telas, boletins e declaracoes.</p>
+{% endblock %}
+
+{% block conteudo %}
+  {% include 'configuracoes/_navegacao.html' %}
+
+  {% if somente_leitura %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-eye-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Voce esta visualizando as configuracoes. Apenas administradores podem
+        altera-las.
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {{ form.hidden_tag() }}
+    {{ resumo_erros(form) }}
+
+    <div class="row g-3">
+      <div class="col-12 col-xl-8">
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-building text-primary"></i> Identificacao
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              {{ campo(form.nome, coluna='col-12') }}
+              {{ campo(form.nome_fantasia, coluna='col-12 col-md-7',
+                       ajuda='Nome exibido no menu, nos boletins e nas declaracoes.') }}
+              {{ campo(form.cnpj, coluna='col-12 col-md-5', mascara='cnpj') }}
+              {{ campo(form.codigo_inep, coluna='col-12 col-md-4') }}
+              {{ campo(form.diretor, coluna='col-12 col-md-4') }}
+              {{ campo(form.secretario, coluna='col-12 col-md-4') }}
+            </div>
+            <p class="form-text mt-2 mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              Diretor e secretario aparecem nas linhas de assinatura dos
+              documentos emitidos em PDF.
+            </p>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-telephone text-primary"></i> Contato e endereco
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              {{ campo(form.telefone, coluna='col-12 col-md-4', mascara='telefone') }}
+              {{ campo(form.email, coluna='col-12 col-md-4') }}
+              {{ campo(form.site, coluna='col-12 col-md-4') }}
+              {{ campo(form.cep, coluna='col-6 col-md-3', mascara='cep') }}
+              {{ campo(form.logradouro, coluna='col-12 col-md-6') }}
+              {{ campo(form.numero, coluna='col-6 col-md-3') }}
+              {{ campo(form.bairro, coluna='col-12 col-md-5') }}
+              {{ campo(form.cidade, coluna='col-8 col-md-5') }}
+              {{ selecao(form.uf, coluna='col-4 col-md-2') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-image text-primary"></i> Identidade visual
+          </div>
+          <div class="card-body text-center">
+            {% if escola.logo %}
+              <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+                   alt="Logo da escola" class="img-fluid mb-3 rounded"
+                   style="max-height: 120px;">
+            {% else %}
+              <div class="sge-avatar sge-avatar--lg mx-auto mb-3">
+                <i class="bi bi-building"></i>
+              </div>
+            {% endif %}
+
+            {{ form.logo(class="form-control" + (" is-invalid" if form.logo.errors else "")) }}
+            {% if form.logo.errors %}
+              <div class="invalid-feedback d-block text-start">{{ form.logo.errors[0] }}</div>
+            {% endif %}
+            <div class="form-text text-start mt-2">
+              Aparece no menu lateral, na tela de login e no cabecalho dos
+              documentos.
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-chat-left-text text-primary"></i> Mensagem de login
+          </div>
+          <div class="card-body">
+            {{ area_texto(form.mensagem_login, coluna='col-12', linhas=3) }}
+            <p class="form-text mb-0 mt-2">
+              Util para comunicados gerais, como manutencao programada.
+            </p>
+          </div>
+        </div>
+
+        {% if not somente_leitura %}
+          <div class="card">
+            <div class="card-body sge-acoes-form">
+              <button type="submit" class="btn btn-primary flex-grow-1">
+                <i class="bi bi-check-lg"></i> Salvar
+              </button>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+{% endblock %}

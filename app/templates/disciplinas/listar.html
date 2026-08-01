@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao, coluna_ordenavel, linha_sem_resultado %}
+
+{% block titulo %}Disciplinas{% endblock %}
+{% block titulo_pagina %}Disciplinas{% endblock %}
+
+{% block subtitulo %}
+  <p>Componentes curriculares reutilizados pelas turmas de todos os anos letivos.</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.DISCIPLINA_CRIAR) %}
+    <a href="{{ url_for('disciplinas.nova') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Nova disciplina
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-6">
+          <label for="{{ form.busca.id }}" class="form-label">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            {{ form.busca(class="form-control", placeholder="Nome ou codigo") }}
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label for="{{ form.ativa.id }}" class="form-label">Situacao</label>
+          {{ form.ativa(class="form-select") }}
+        </div>
+        <div class="col-6 col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('disciplinas.listar') }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-book text-primary"></i> Disciplinas
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                {{ coluna_ordenavel('Disciplina', 'nome', 'disciplinas.listar', ordenacao, parametros) }}
+                {{ coluna_ordenavel('Codigo', 'codigo', 'disciplinas.listar', ordenacao, parametros) }}
+                {{ coluna_ordenavel('Carga horaria', 'carga', 'disciplinas.listar', ordenacao, parametros, 'd-none d-md-table-cell') }}
+                <th class="text-center d-none d-lg-table-cell">Turmas</th>
+                <th class="text-center">Situacao</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for disciplina in pagina.items %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="sge-ponto" style="background: {{ disciplina.cor }};"></span>
+                      <span class="fw-semibold">{{ disciplina.nome }}</span>
+                    </div>
+                  </td>
+                  <td><span class="badge sge-badge-suave">{{ disciplina.codigo }}</span></td>
+                  <td class="d-none d-md-table-cell sge-numerico small">{{ disciplina.carga_horaria }}h</td>
+                  <td class="text-center d-none d-lg-table-cell sge-numerico small">
+                    {{ disciplina.turmas_disciplinas | length }}
+                  </td>
+                  <td class="text-center">
+                    <span class="badge sge-badge-suave text-bg-{{ 'success' if disciplina.ativa else 'secondary' }}">
+                      {{ 'Ativa' if disciplina.ativa else 'Inativa' }}
+                    </span>
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    {% if tem_permissao(Permissao.DISCIPLINA_EDITAR) %}
+                      <a href="{{ url_for('disciplinas.editar', disciplina_id=disciplina.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                    {% if tem_permissao(Permissao.DISCIPLINA_EXCLUIR) %}
+                      <form method="post" class="d-inline"
+                            action="{{ url_for('disciplinas.excluir', disciplina_id=disciplina.id) }}"
+                            data-confirmar
+                            data-confirmar-titulo="Excluir disciplina"
+                            data-confirmar-texto="A disciplina sera excluida. Isso so e possivel se ela nao estiver vinculada a nenhuma turma."
+                            data-confirmar-botao="Excluir">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                data-bs-toggle="tooltip" title="Excluir">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(6) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-book"></i>
+          <h5>Nenhuma disciplina cadastrada</h5>
+          <p class="mb-3">Cadastre as disciplinas antes de montar a grade das turmas.</p>
+          {% if tem_permissao(Permissao.DISCIPLINA_CRIAR) %}
+            <a href="{{ url_for('disciplinas.nova') }}" class="btn btn-primary">
+              <i class="bi bi-plus-lg"></i> Nova disciplina
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'disciplinas.listar', parametros, 'disciplinas') }}
+
+{% endblock %}

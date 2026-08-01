@@ -1,0 +1,139 @@
+# ---------------------------------------------------------------------------
+# SGE - Sistema de Gestao Escolar
+# Configuracao das ferramentas de qualidade de codigo.
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "-ra",
+]
+markers = [
+    "lento: testes que levam mais de um segundo",
+    "seguranca: testes de autenticacao, autorizacao e escopo de acesso",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:reportlab.*",
+]
+
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = [
+    "app/cli.py",           # comandos interativos, cobertos por uso manual
+    "*/migrations/*",
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+# A meta pratica e cobrir regra de negocio e autorizacao, nao alcancar 100%
+# em codigo trivial de template e rota.
+precision = 1
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = "migrations"
+
+
+[tool.isort]
+profile = "black"
+line_length = 88
+skip = ["migrations", "venv"]
+known_first_party = ["app", "config", "scripts"]
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = ["migrations", "venv", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear (armadilhas comuns)
+    "S",    # bandit (seguranca)
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplificacoes
+]
+ignore = [
+    "E501",   # comprimento de linha: o Black ja formata
+    "B008",   # chamadas em argumento padrao: usado pelos campos WTForms
+    "S101",   # assert: legitimo dentro dos testes
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Testes exercitam justamente os caminhos que o bandit costuma sinalizar.
+"tests/*" = ["S", "B", "SIM"]
+
+# O seed usa random comum de proposito: nao ha requisito criptografico.
+"scripts/seed_dados.py" = ["S311"]
+
+# --- Exceções revisadas individualmente -------------------------------------
+# Cada item abaixo foi analisado; a supressão é uma decisão, não descuido.
+
+# S105: compara a SECRET_KEY com o valor-sentinela inseguro. Essa comparação
+# É a verificação de segurança — a aplicação se recusa a subir com a chave
+# padrão. Não há senha embutida.
+"config/settings.py" = ["S105"]
+"app/cli.py" = ["S105"]
+
+# S110/SIM105: a auditoria falha em silêncio de propósito. A escola não pode
+# ficar sem lançar notas porque o log teve um problema; a falha vai para o
+# logger da aplicação (ver docstring do módulo).
+"app/services/auditoria_service.py" = ["S110", "SIM105"]
+
+# SIM105: a leitura de aviso é acessória — nunca pode impedir a exibição.
+"app/blueprints/avisos/rotas.py" = ["SIM105"]
+
+# S704: `Markup` em `quebra_linha` é seguro por construção. O autoescape do
+# Jinja2 escapa o texto ANTES do filtro rodar, então apenas as tags <br>
+# geradas aqui são HTML.
+"app/utils/formatadores.py" = ["S704"]
+
+# UP042: `EnumDominio` herda de `str` e `Enum` intencionalmente. `StrEnum`
+# (3.11+) não permite o `__new__` customizado que carrega rótulo e cor em
+# cada membro — recurso usado por todos os templates.
+"app/models/enums.py" = ["UP042"]
+
+# SIM117: os `with` aninhados no backup abrem conexões SQLite distintas
+# (origem e destino). Fundi-los tornaria a leitura pior, não melhor.
+"app/services/backup_service.py" = ["SIM117"]
+
+# SIM102/SIM103: os `if` aninhados que restam são guardas sequenciais, cada
+# uma com significado próprio e comentário explicativo (ex.: "DDD válido",
+# "celular precisa começar com 9"). Colapsá-las em uma expressão booleana
+# única esconderia o motivo de cada regra.
+"app/utils/validadores.py" = ["SIM103"]
+"app/__init__.py" = ["SIM102"]
+"app/blueprints/notas/rotas.py" = ["SIM102"]
+"app/services/nota_service.py" = ["SIM102"]
+"app/services/pessoa_service.py" = ["SIM102"]
+
+# S104: o servidor de desenvolvimento escuta em 0.0.0.0 de propósito — é como
+# se testa o sistema no celular e no tablet da escola, na rede local. Em
+# produção quem expõe a porta é o Nginx, e `run.py` não é usado.
+"run.py" = ["S104"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "config", "scripts"]

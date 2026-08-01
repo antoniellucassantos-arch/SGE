@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import linha_sem_resultado %}
+
+{% block titulo %}{{ definicao.nome }}{% endblock %}
+{% block titulo_pagina %}{{ dados.titulo }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('relatorios.index') }}">Relatorios</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ definicao.nome }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>{{ definicao.descricao }}</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.RELATORIO_EXPORTAR) %}
+    <a href="{{ url_for('relatorios.exportar_excel', chave=chave, **request.args) }}"
+       class="btn btn-primary">
+      <i class="bi bi-file-earmark-excel"></i> Excel
+    </a>
+    <a href="{{ url_for('relatorios.exportar_pdf', chave=chave, **request.args) }}"
+       class="btn btn-light" target="_blank" rel="noopener">
+      <i class="bi bi-file-earmark-pdf"></i> PDF
+    </a>
+  {% endif %}
+  <button type="button" class="btn btn-light" data-imprimir>
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Filtros --- #}
+  <div class="card mb-3 sge-nao-imprimir">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="filtroAno">Ano letivo</label>
+          <select class="form-select" name="ano_letivo_id" id="filtroAno">
+            <option value="">Todos</option>
+            {% for ano in anos %}
+              <option value="{{ ano.id }}" {{ 'selected' if filtros.ano_letivo_id == ano.id }}>
+                {{ ano.ano }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if chave in ['alunos'] %}
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="filtroTurma">Turma</label>
+            <select class="form-select" name="turma_id" id="filtroTurma">
+              <option value="">Todas</option>
+              {% for turma in turmas %}
+                <option value="{{ turma.id }}" {{ 'selected' if filtros.turma_id == turma.id }}>
+                  {{ turma.identificacao_curta }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+
+        <div class="col-6 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Aplicar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('relatorios.visualizar', chave=chave) }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# --- Tabela --- #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi {{ definicao.icone }} text-primary"></i> {{ dados.titulo }}
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ dados.linhas | length }}</span>
+      {% if dados.linhas %}
+        <div class="ms-auto sge-nao-imprimir" style="max-width:220px;">
+          <input type="search" class="form-control form-control-sm"
+                 placeholder="Filtrar nesta lista..."
+                 data-filtrar-tabela="tabelaRelatorio" aria-label="Filtrar resultados">
+        </div>
+      {% endif %}
+    </div>
+    <div class="card-body p-0">
+      {% if dados.linhas %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0" id="tabelaRelatorio">
+            <thead>
+              <tr>
+                <th class="text-center" style="width:48px;">Nº</th>
+                {% for titulo in dados.cabecalhos %}
+                  <th>{{ titulo }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for linha in dados.linhas %}
+                <tr>
+                  <td class="text-center small sge-texto-fraco sge-numerico">{{ loop.index }}</td>
+                  {% for valor in linha %}
+                    <td class="small sge-quebra">{{ valor or '—' }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(dados.cabecalhos | length + 1) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-inbox"></i>
+          <h5>Nenhum registro encontrado</h5>
+          <p class="mb-0 small">
+            {{ dados.observacao or 'Ajuste os filtros e tente novamente.' }}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if dados.observacao and dados.linhas %}
+      <div class="card-footer small sge-texto-suave">
+        <i class="bi bi-info-circle me-1"></i> {{ dados.observacao }}
+      </div>
+    {% endif %}
+  </div>
+
+{% endblock %}

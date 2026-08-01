@@ -1,0 +1,27 @@
+{# Abas de navegacao compartilhadas pelas telas de configuracao. #}
+<ul class="nav nav-pills mb-3 flex-nowrap overflow-auto pb-1">
+  <li class="nav-item flex-shrink-0">
+    <a class="nav-link {{ 'active' if request.endpoint == 'configuracoes.index' }}"
+       href="{{ url_for('configuracoes.index') }}">
+      <i class="bi bi-building me-1"></i> Dados da escola
+    </a>
+  </li>
+  <li class="nav-item flex-shrink-0">
+    <a class="nav-link {{ 'active' if request.endpoint == 'configuracoes.parametros' }}"
+       href="{{ url_for('configuracoes.parametros') }}">
+      <i class="bi bi-sliders me-1"></i> Parametros academicos
+    </a>
+  </li>
+  <li class="nav-item flex-shrink-0">
+    <a class="nav-link {{ 'active' if request.endpoint in ['configuracoes.anos_letivos', 'configuracoes.novo_ano_letivo', 'configuracoes.editar_ano_letivo'] }}"
+       href="{{ url_for('configuracoes.anos_letivos') }}">
+      <i class="bi bi-calendar3 me-1"></i> Anos letivos
+    </a>
+  </li>
+  <li class="nav-item flex-shrink-0">
+    <a class="nav-link {{ 'active' if request.endpoint == 'configuracoes.estrutura' }}"
+       href="{{ url_for('configuracoes.estrutura') }}">
+      <i class="bi bi-diagram-2 me-1"></i> Series, salas e horarios
+    </a>
+  </li>
+</ul>

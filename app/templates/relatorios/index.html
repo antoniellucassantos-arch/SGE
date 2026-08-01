@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Relatorios{% endblock %}
+{% block titulo_pagina %}Relatorios{% endblock %}
+
+{% block subtitulo %}
+  <p>Listagens e indicadores para acompanhamento e prestacao de contas.</p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if relatorios %}
+    <div class="row g-3">
+      {% for chave, definicao in relatorios.items() %}
+        <div class="col-12 col-md-6 col-xl-4">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-start gap-3">
+                <div class="sge-indicador__icone sge-icone--{{ definicao.cor }} flex-shrink-0">
+                  <i class="bi {{ definicao.icone }}"></i>
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                  <h3 class="h6 mb-1">{{ definicao.nome }}</h3>
+                  <p class="small sge-texto-suave mb-0">{{ definicao.descricao }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+              <a href="{{ url_for('relatorios.visualizar', chave=chave) }}"
+                 class="btn btn-sm btn-primary flex-fill">
+                <i class="bi bi-eye"></i> Visualizar
+              </a>
+              {% if tem_permissao(Permissao.RELATORIO_EXPORTAR) %}
+                <a href="{{ url_for('relatorios.exportar_excel', chave=chave) }}"
+                   class="btn btn-sm btn-light"
+                   data-bs-toggle="tooltip" title="Exportar para Excel">
+                  <i class="bi bi-file-earmark-excel"></i>
+                </a>
+                <a href="{{ url_for('relatorios.exportar_pdf', chave=chave) }}"
+                   class="btn btn-sm btn-light" target="_blank" rel="noopener"
+                   data-bs-toggle="tooltip" title="Exportar para PDF">
+                  <i class="bi bi-file-earmark-pdf"></i>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-graph-up"></i>
+      <h5>Nenhum relatorio disponivel</h5>
+      <p class="mb-0">Seu perfil de acesso nao possui relatorios habilitados.</p>
+    </div>
+  {% endif %}
+
+{% endblock %}

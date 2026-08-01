@@ -1,0 +1,464 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import selecao, caixa %}
+
+{% block titulo %}{{ aluno.nome_exibicao }}{% endblock %}
+{% block titulo_pagina %}Ficha do aluno{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('alunos.listar') }}">Alunos</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ aluno.nome_exibicao }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+    <a href="{{ url_for('alunos.editar', aluno_id=aluno.id) }}" class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Editar
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.BOLETIM_VISUALIZAR) and resumo.matricula %}
+    <a href="{{ url_for('boletim.do_aluno', aluno_id=aluno.id) }}" class="btn btn-light">
+      <i class="bi bi-journal-text"></i> Boletim
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.MATRICULA_CRIAR) and not resumo.matricula %}
+    <a href="{{ url_for('matriculas.nova', aluno_id=aluno.id) }}" class="btn btn-light">
+      <i class="bi bi-file-earmark-plus"></i> Matricular
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Cabecalho de identificacao                                         #}
+  {# ------------------------------------------------------------------ #}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      {% if aluno.foto %}
+        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+             alt="Foto de {{ aluno.nome_exibicao }}" class="sge-avatar sge-avatar--lg">
+      {% else %}
+        <span class="sge-avatar sge-avatar--lg">{{ aluno.iniciais }}</span>
+      {% endif %}
+
+      <div class="min-w-0 flex-grow-1">
+        <h2 class="h5 mb-1 sge-quebra">{{ aluno.nome_exibicao }}</h2>
+        {% if aluno.nome_social %}
+          <div class="small sge-texto-fraco">Nome civil: {{ aluno.nome_completo }}</div>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <span class="badge sge-badge-suave">
+            <i class="bi bi-upc me-1"></i>{{ aluno.codigo }}
+          </span>
+          <span class="badge sge-badge-suave text-bg-{{ aluno.situacao.cor }}">
+            {{ aluno.situacao.rotulo }}
+          </span>
+          {% if resumo.turma %}
+            <span class="badge sge-badge-suave text-bg-primary">
+              <i class="bi bi-diagram-3 me-1"></i>{{ resumo.turma.nome_completo }}
+            </span>
+          {% endif %}
+          {% if aluno.idade is not none %}
+            <span class="badge sge-badge-suave">{{ aluno.idade }} anos</span>
+          {% endif %}
+          {% if aluno.bolsista %}
+            <span class="badge sge-badge-suave text-bg-info">
+              Bolsista {{ aluno.percentual_bolsa | percentual if aluno.percentual_bolsa }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Alerta de saude                                                    #}
+  {# ------------------------------------------------------------------ #}
+  {% if aluno.tem_alerta_saude and pode_ver_saude %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-heart-pulse-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Atencao: informacoes de saude relevantes.</strong>
+        <ul class="mb-0 mt-1 ps-3 small">
+          {% if aluno.alergias %}<li><strong>Alergias:</strong> {{ aluno.alergias }}</li>{% endif %}
+          {% if aluno.medicamentos_continuos %}<li><strong>Medicamentos:</strong> {{ aluno.medicamentos_continuos }}</li>{% endif %}
+          {% if aluno.condicoes_saude %}<li><strong>Condicoes:</strong> {{ aluno.condicoes_saude }}</li>{% endif %}
+          {% if aluno.possui_deficiencia %}<li><strong>Deficiencia:</strong> {{ aluno.descricao_deficiencia or 'Nao detalhada' }}</li>{% endif %}
+        </ul>
+      </div>
+    </div>
+  {% endif %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Indicadores academicos                                             #}
+  {# ------------------------------------------------------------------ #}
+  {% if resumo.matricula %}
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-3">
+        <div class="sge-indicador">
+          <div class="sge-indicador__icone sge-icone--primaria"><i class="bi bi-file-earmark-text"></i></div>
+          <div class="min-w-0">
+            <div class="sge-indicador__valor" style="font-size:1.1rem;">{{ resumo.matricula.numero }}</div>
+            <div class="sge-indicador__rotulo">Matricula</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sge-indicador">
+          <div class="sge-indicador__icone sge-icone--info"><i class="bi bi-journal"></i></div>
+          <div class="min-w-0">
+            <div class="sge-indicador__valor sge-numerico">{{ resumo.total_aulas }}</div>
+            <div class="sge-indicador__rotulo">Aulas</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sge-indicador">
+          <div class="sge-indicador__icone sge-icone--{{ 'perigo' if resumo.total_faltas > 10 else 'neutro' }}">
+            <i class="bi bi-x-circle"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="sge-indicador__valor sge-numerico">{{ resumo.total_faltas }}</div>
+            <div class="sge-indicador__rotulo">Faltas</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sge-indicador">
+          <div class="sge-indicador__icone sge-icone--{{ 'sucesso' if (resumo.percentual_frequencia or 100) >= 75 else 'perigo' }}">
+            <i class="bi bi-calendar-check"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="sge-indicador__valor sge-numerico">
+              {{ resumo.percentual_frequencia | percentual if resumo.percentual_frequencia is not none else '—' }}
+            </div>
+            <div class="sge-indicador__rotulo">Frequencia</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Este aluno nao possui matricula ativa no ano letivo corrente.
+      </div>
+    </div>
+  {% endif %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Abas de conteudo                                                   #}
+  {# ------------------------------------------------------------------ #}
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aba-dados"
+              type="button" role="tab">
+        <i class="bi bi-person me-1"></i> Dados
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-responsaveis"
+              type="button" role="tab">
+        <i class="bi bi-people me-1"></i> Responsaveis
+        <span class="badge sge-badge-suave ms-1">{{ aluno.vinculos_responsaveis | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-matriculas"
+              type="button" role="tab">
+        <i class="bi bi-clock-history me-1"></i> Matriculas
+        <span class="badge sge-badge-suave ms-1">{{ resumo.total_matriculas }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    {# ---------------- Aba: dados ---------------- #}
+    <div class="tab-pane fade show active" id="aba-dados" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-card-text text-primary"></i> Documentos</div>
+            <div class="card-body">
+              <dl class="row mb-0 small">
+                <dt class="col-5 sge-texto-suave">CPF</dt>
+                <dd class="col-7 sge-numerico">{{ aluno.cpf | cpf }}</dd>
+                <dt class="col-5 sge-texto-suave">RG</dt>
+                <dd class="col-7">{{ aluno.rg or '—' }}{% if aluno.rg_orgao_emissor %} <span class="sge-texto-fraco">({{ aluno.rg_orgao_emissor }})</span>{% endif %}</dd>
+                <dt class="col-5 sge-texto-suave">Nascimento</dt>
+                <dd class="col-7 sge-numerico">{{ aluno.data_nascimento | data }}</dd>
+                <dt class="col-5 sge-texto-suave">Sexo</dt>
+                <dd class="col-7">{{ aluno.sexo.rotulo }}</dd>
+                <dt class="col-5 sge-texto-suave">Naturalidade</dt>
+                <dd class="col-7">{{ aluno.naturalidade or '—' }}{% if aluno.uf_naturalidade %}/{{ aluno.uf_naturalidade }}{% endif %}</dd>
+                <dt class="col-5 sge-texto-suave">Nacionalidade</dt>
+                <dd class="col-7">{{ aluno.nacionalidade or '—' }}</dd>
+                <dt class="col-5 sge-texto-suave">Certidao</dt>
+                <dd class="col-7">{{ aluno.certidao_nascimento or '—' }}</dd>
+                {% if pode_ver_saude %}
+                  <dt class="col-5 sge-texto-suave">NIS</dt>
+                  <dd class="col-7 sge-numerico">{{ aluno.nis or '—' }}</dd>
+                  <dt class="col-5 sge-texto-suave">Cartao SUS</dt>
+                  <dd class="col-7 sge-numerico">{{ aluno.cartao_sus or '—' }}</dd>
+                {% endif %}
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-geo-alt text-primary"></i> Contato e endereco</div>
+            <div class="card-body">
+              <dl class="row mb-0 small">
+                <dt class="col-5 sge-texto-suave">Celular</dt>
+                <dd class="col-7 sge-numerico">{{ aluno.celular | telefone }}</dd>
+                <dt class="col-5 sge-texto-suave">Telefone</dt>
+                <dd class="col-7 sge-numerico">{{ aluno.telefone | telefone }}</dd>
+                <dt class="col-5 sge-texto-suave">E-mail</dt>
+                <dd class="col-7 sge-quebra">{{ aluno.email or '—' }}</dd>
+                <dt class="col-5 sge-texto-suave">Endereco</dt>
+                <dd class="col-7 sge-quebra">{{ aluno.endereco_completo or '—' }}</dd>
+              </dl>
+
+              <hr>
+              <div class="d-flex flex-wrap gap-2">
+                {% if aluno.usa_transporte_escolar %}
+                  <span class="badge sge-badge-suave text-bg-info"><i class="bi bi-bus-front me-1"></i>Transporte escolar</span>
+                {% endif %}
+                {% if aluno.autorizado_sair_sozinho %}
+                  <span class="badge sge-badge-suave text-bg-warning"><i class="bi bi-door-open me-1"></i>Sai desacompanhado</span>
+                {% endif %}
+                {% if aluno.autoriza_uso_imagem %}
+                  <span class="badge sge-badge-suave text-bg-success"><i class="bi bi-camera me-1"></i>Autoriza uso de imagem</span>
+                {% else %}
+                  <span class="badge sge-badge-suave text-bg-danger"><i class="bi bi-camera-video-off me-1"></i>Nao autoriza uso de imagem</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if aluno.observacoes %}
+          <div class="col-12">
+            <div class="card">
+              <div class="card-header"><i class="bi bi-sticky text-primary"></i> Observacoes</div>
+              <div class="card-body small">{{ aluno.observacoes | quebra_linha }}</div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ---------------- Aba: responsaveis ---------------- #}
+    <div class="tab-pane fade" id="aba-responsaveis" role="tabpanel">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-people text-primary"></i> Responsaveis vinculados
+          {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+            <button class="btn btn-sm btn-primary ms-auto" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#formVincular">
+              <i class="bi bi-plus-lg"></i> Vincular
+            </button>
+          {% endif %}
+        </div>
+
+        {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+          <div class="collapse" id="formVincular">
+            <div class="card-body border-bottom" style="background: var(--sge-superficie-alt);">
+              <form method="post" action="{{ url_for('alunos.vincular_responsavel', aluno_id=aluno.id) }}">
+                {{ form_responsavel.hidden_tag() }}
+                <div class="row g-3 align-items-end">
+                  {{ selecao(form_responsavel.responsavel_id, coluna='col-12 col-md-5') }}
+                  {{ selecao(form_responsavel.parentesco, coluna='col-6 col-md-3') }}
+                  <div class="col-6 col-md-2">
+                    <label class="form-label" for="{{ form_responsavel.ordem_contato.id }}">
+                      Ordem de contato
+                    </label>
+                    {{ form_responsavel.ordem_contato(class="form-control") }}
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                      <i class="bi bi-link-45deg"></i> Vincular
+                    </button>
+                  </div>
+                  {{ caixa(form_responsavel.responsavel_legal, coluna='col-12 col-md-4') }}
+                  {{ caixa(form_responsavel.responsavel_financeiro, coluna='col-12 col-md-4') }}
+                  {{ caixa(form_responsavel.autorizado_buscar, coluna='col-12 col-md-4') }}
+                </div>
+                <p class="form-text mb-0 mt-2">
+                  O responsavel precisa estar previamente cadastrado em
+                  <a href="{{ url_for('responsaveis.listar') }}">Responsaveis</a>.
+                </p>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="card-body p-0">
+          {% if aluno.vinculos_responsaveis %}
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Responsavel</th>
+                    <th>Parentesco</th>
+                    <th class="d-none d-md-table-cell">Contato</th>
+                    <th class="text-center">Atribuicoes</th>
+                    <th class="sge-tabela-acoes">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for vinculo in aluno.vinculos_responsaveis %}
+                    {% set resp = vinculo.responsavel %}
+                    <tr>
+                      <td>
+                        <a href="{{ url_for('responsaveis.detalhe', responsavel_id=resp.id) }}"
+                           class="fw-semibold text-reset text-decoration-none">
+                          {{ resp.nome_exibicao }}
+                        </a>
+                        <div class="small sge-texto-fraco sge-numerico">{{ resp.cpf | cpf }}</div>
+                      </td>
+                      <td><span class="badge sge-badge-suave text-bg-{{ vinculo.parentesco.cor }}">{{ vinculo.parentesco.rotulo }}</span></td>
+                      <td class="d-none d-md-table-cell small sge-numerico">{{ resp.telefone_formatado }}</td>
+                      <td class="text-center">
+                        {% if vinculo.responsavel_legal %}
+                          <i class="bi bi-shield-check text-primary" data-bs-toggle="tooltip" title="Responsavel legal"></i>
+                        {% endif %}
+                        {% if vinculo.responsavel_financeiro %}
+                          <i class="bi bi-cash-coin text-success ms-1" data-bs-toggle="tooltip" title="Responsavel financeiro"></i>
+                        {% endif %}
+                        {% if vinculo.autorizado_buscar %}
+                          <i class="bi bi-door-open text-info ms-1" data-bs-toggle="tooltip" title="Autorizado a buscar"></i>
+                        {% endif %}
+                        <span class="badge sge-badge-suave ms-1">{{ vinculo.ordem_contato }}º</span>
+                      </td>
+                      <td class="sge-tabela-acoes">
+                        {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+                          <form method="post" class="d-inline"
+                                action="{{ url_for('alunos.desvincular_responsavel', aluno_id=aluno.id, responsavel_id=resp.id) }}"
+                                data-confirmar
+                                data-confirmar-titulo="Remover vinculo"
+                                data-confirmar-texto="O responsavel {{ resp.nome_exibicao }} deixara de ter acesso aos dados deste aluno."
+                                data-confirmar-botao="Remover vinculo">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                    data-bs-toggle="tooltip" title="Remover vinculo">
+                              <i class="bi bi-link-45deg"></i>
+                            </button>
+                          </form>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="sge-vazio">
+              <i class="bi bi-people"></i>
+              <h5>Nenhum responsavel vinculado</h5>
+              <p class="mb-0 small">
+                Todo aluno menor de idade deve ter ao menos um responsavel legal.
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- Aba: matriculas ---------------- #}
+    <div class="tab-pane fade" id="aba-matriculas" role="tabpanel">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-clock-history text-primary"></i> Historico de matriculas</div>
+        <div class="card-body p-0">
+          {% if aluno.matriculas %}
+            <div class="sge-tabela-wrapper">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Numero</th>
+                    <th>Ano letivo</th>
+                    <th>Turma</th>
+                    <th class="d-none d-md-table-cell">Data</th>
+                    <th>Situacao</th>
+                    <th class="d-none d-lg-table-cell">Resultado</th>
+                    <th class="sge-tabela-acoes">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for matricula in aluno.matriculas %}
+                    <tr>
+                      <td class="sge-numerico small">{{ matricula.numero }}</td>
+                      <td class="sge-numerico">{{ matricula.ano_letivo.ano if matricula.ano_letivo else '—' }}</td>
+                      <td>{{ matricula.turma.identificacao_curta if matricula.turma else '—' }}</td>
+                      <td class="d-none d-md-table-cell sge-numerico small">{{ matricula.data_matricula | data }}</td>
+                      <td><span class="badge sge-badge-suave text-bg-{{ matricula.situacao.cor }}">{{ matricula.situacao.rotulo }}</span></td>
+                      <td class="d-none d-lg-table-cell">
+                        <span class="badge sge-badge-suave text-bg-{{ matricula.resultado_final.cor }}">
+                          {{ matricula.resultado_final.rotulo }}
+                        </span>
+                      </td>
+                      <td class="sge-tabela-acoes">
+                        {% if tem_permissao(Permissao.MATRICULA_VISUALIZAR) %}
+                          <a href="{{ url_for('matriculas.detalhe', matricula_id=matricula.id) }}"
+                             class="btn btn-sm btn-light sge-btn-icone"
+                             data-bs-toggle="tooltip" title="Ver matricula">
+                            <i class="bi bi-eye"></i>
+                          </a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="sge-vazio">
+              <i class="bi bi-file-earmark-text"></i>
+              <h5>Nenhuma matricula registrada</h5>
+              {% if tem_permissao(Permissao.MATRICULA_CRIAR) %}
+                <a href="{{ url_for('matriculas.nova', aluno_id=aluno.id) }}" class="btn btn-primary mt-2">
+                  <i class="bi bi-file-earmark-plus"></i> Matricular aluno
+                </a>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Zona de risco                                                      #}
+  {# ------------------------------------------------------------------ #}
+  {% if tem_permissao(Permissao.ALUNO_EXCLUIR) %}
+    <div class="card mt-4 border-danger-subtle">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="min-w-0">
+          <h6 class="mb-1 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Excluir cadastro</h6>
+          <p class="small sge-texto-suave mb-0">
+            A exclusao e logica: o historico escolar e preservado e o cadastro
+            pode ser restaurado pela direcao.
+          </p>
+        </div>
+        <form method="post" action="{{ url_for('alunos.excluir', aluno_id=aluno.id) }}"
+              data-confirmar
+              data-confirmar-titulo="Excluir aluno"
+              data-confirmar-texto="O cadastro de {{ aluno.nome_exibicao }} sera marcado como excluido. O historico escolar sera preservado."
+              data-confirmar-botao="Excluir cadastro">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> Excluir
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

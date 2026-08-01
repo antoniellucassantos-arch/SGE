@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao %}
+
+{% block titulo %}Chamadas pendentes{% endblock %}
+{% block titulo_pagina %}Chamadas pendentes{% endblock %}
+
+{% block subtitulo %}
+  <p>Aulas registradas nos ultimos 30 dias cuja frequencia ainda nao foi lancada.</p>
+{% endblock %}
+
+{% block acoes %}
+  <a href="{{ url_for('frequencia.index') }}" class="btn btn-light">
+    <i class="bi bi-arrow-left"></i> Diario de classe
+  </a>
+{% endblock %}
+
+{% block conteudo %}
+
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-exclamation-triangle text-warning"></i> Pendencias
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Disciplina</th>
+                <th class="d-none d-md-table-cell">Turma</th>
+                <th class="d-none d-lg-table-cell">Professor</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for aula in pagina.items %}
+                {% set vinculo = aula.turma_disciplina %}
+                <tr>
+                  <td class="sge-numerico small text-nowrap">
+                    {{ aula.data_aula | data }}
+                    <div class="sge-texto-fraco">{{ aula.data_aula | tempo_relativo }}</div>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="sge-ponto"
+                            style="background: {{ vinculo.disciplina.cor if vinculo and vinculo.disciplina else '#6c757d' }};"></span>
+                      <span class="fw-semibold">
+                        {{ vinculo.disciplina.nome if vinculo and vinculo.disciplina else '?' }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="d-none d-md-table-cell small">
+                    {{ vinculo.turma.identificacao_curta if vinculo and vinculo.turma else '?' }}
+                  </td>
+                  <td class="d-none d-lg-table-cell small">
+                    {{ vinculo.nome_professor if vinculo else '?' }}
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('frequencia.chamada', aula_id=aula.id) }}"
+                       class="btn btn-sm btn-primary">
+                      <i class="bi bi-check2-square"></i>
+                      <span class="d-none d-md-inline ms-1">Fazer chamada</span>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-check2-circle"></i>
+          <h5>Nenhuma chamada pendente</h5>
+          <p class="mb-0 small">
+            Todas as aulas registradas nos ultimos 30 dias tiveram a
+            frequencia lancada.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'frequencia.pendentes', {}, 'aulas pendentes') }}
+
+{% endblock %}

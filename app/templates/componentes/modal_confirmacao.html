@@ -1,0 +1,40 @@
+{# ===========================================================================
+   Modal generico de confirmacao para acoes destrutivas.
+
+   Uso: adicione ``data-confirmar`` ao formulario ou link. O JS intercepta o
+   clique, exibe este modal e so prossegue apos a confirmacao explicita.
+
+     <form method="post" action="..." data-confirmar
+           data-confirmar-titulo="Excluir aluno"
+           data-confirmar-texto="Esta acao pode ser desfeita pela direcao."
+           data-confirmar-botao="Excluir">
+
+   Centralizar aqui garante que toda exclusao do sistema tenha o mesmo
+   comportamento e o mesmo grau de atrito — nenhuma acao destrutiva acontece
+   com um unico clique acidental.
+   =========================================================================== #}
+<div class="modal fade" id="modalConfirmacao" tabindex="-1"
+     aria-labelledby="modalConfirmacaoTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" id="modalConfirmacaoTitulo">Confirmar acao</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-3">
+          <div class="sge-indicador__icone sge-icone--alerta flex-shrink-0" id="modalConfirmacaoIcone">
+            <i class="bi bi-exclamation-triangle"></i>
+          </div>
+          <p class="mb-0 pt-2" id="modalConfirmacaoTexto">
+            Tem certeza que deseja continuar?
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="modalConfirmacaoBotao">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>

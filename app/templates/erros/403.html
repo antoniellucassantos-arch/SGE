@@ -1,0 +1,16 @@
+{% extends 'erros/base_erro.html' %}
+{% block titulo %}Acesso negado{% endblock %}
+{% block cor_icone %}sge-icone--perigo{% endblock %}
+{% block icone %}bi-shield-lock{% endblock %}
+{% block codigo %}403{% endblock %}
+{% block cabecalho %}Acesso negado{% endblock %}
+{% block descricao %}
+  Voce nao tem permissao para acessar esta area. Se acredita que isso e um
+  engano, procure a administracao do sistema.
+{% endblock %}
+{% block extra %}
+  <p class="small sge-texto-fraco mt-4 mb-0">
+    <i class="bi bi-info-circle me-1"></i>
+    Esta tentativa foi registrada na trilha de auditoria.
+  </p>
+{% endblock %}

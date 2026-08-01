@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao %}
+
+{% block titulo %}Auditoria{% endblock %}
+{% block titulo_pagina %}Trilha de auditoria{% endblock %}
+
+{% block subtitulo %}
+  <p>Registro imutavel de quem fez o que, quando e de onde.</p>
+{% endblock %}
+
+{% block conteudo %}
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label" for="filtroUsuario">Usuario</label>
+          <select class="form-select" name="usuario_id" id="filtroUsuario">
+            <option value="">Todos</option>
+            {% for usuario in usuarios %}
+              <option value="{{ usuario.id }}"
+                      {{ 'selected' if filtros.usuario_id == usuario.id | string }}>
+                {{ usuario.nome_completo }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="filtroAcao">Acao</label>
+          <select class="form-select" name="acao" id="filtroAcao">
+            <option value="">Todas</option>
+            {% for acao in acoes %}
+              <option value="{{ acao.value }}" {{ 'selected' if filtros.acao == acao.value }}>
+                {{ acao.rotulo }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="filtroEntidade">Entidade</label>
+          <select class="form-select" name="entidade" id="filtroEntidade">
+            <option value="">Todas</option>
+            {% for entidade in entidades %}
+              <option value="{{ entidade }}" {{ 'selected' if filtros.entidade == entidade }}>
+                {{ entidade }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="filtroInicio">De</label>
+          <input type="date" class="form-control" name="data_inicio" id="filtroInicio"
+                 value="{{ filtros.data_inicio }}">
+        </div>
+
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="filtroFim">Ate</label>
+          <input type="date" class="form-control" name="data_fim" id="filtroFim"
+                 value="{{ filtros.data_fim }}">
+        </div>
+
+        <div class="col-12 col-md-1 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i>
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('auditoria.listar') }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-clipboard-check text-primary"></i> Eventos registrados
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Data e hora</th>
+                <th>Acao</th>
+                <th>Descricao</th>
+                <th class="d-none d-lg-table-cell">Usuario</th>
+                <th class="d-none d-xl-table-cell">Origem</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for registro in pagina.items %}
+                <tr>
+                  <td class="small sge-numerico text-nowrap">
+                    {{ registro.criado_em | data_hora }}
+                    <div class="sge-texto-fraco">{{ registro.criado_em | tempo_relativo }}</div>
+                  </td>
+                  <td>
+                    <span class="badge sge-badge-suave text-bg-{{ registro.acao.cor }}">
+                      {{ registro.acao.rotulo }}
+                    </span>
+                  </td>
+                  <td class="small sge-quebra">
+                    {{ registro.descricao or '—' }}
+                    {% if registro.entidade %}
+                      <div class="sge-texto-fraco">
+                        {{ registro.entidade }}{% if registro.entidade_id %} #{{ registro.entidade_id }}{% endif %}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td class="d-none d-lg-table-cell small">{{ registro.nome_responsavel }}</td>
+                  <td class="d-none d-xl-table-cell small sge-texto-fraco sge-numerico">
+                    {{ registro.endereco_ip or '—' }}
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    {% if registro.detalhes %}
+                      <a href="{{ url_for('auditoria.detalhe', log_id=registro.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Ver detalhes">
+                        <i class="bi bi-eye"></i>
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-clipboard"></i>
+          <h5>Nenhum evento encontrado</h5>
+          <p class="mb-0 small">Nenhum registro corresponde aos filtros aplicados.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'auditoria.listar', parametros, 'eventos') }}
+
+  <div class="card mt-3">
+    <div class="card-body small sge-texto-suave">
+      <i class="bi bi-shield-lock me-1"></i>
+      A trilha de auditoria e <strong>somente leitura</strong>. Nao existe rota
+      de edicao ou exclusao individual — por definicao, um registro que pode
+      ser alterado nao serve como evidencia. A limpeza de eventos antigos e
+      feita apenas por rotina administrativa no servidor
+      (<code>flask limpar-auditoria</code>).
+    </div>
+  </div>
+
+{% endblock %}

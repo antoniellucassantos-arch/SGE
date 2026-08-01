@@ -1,0 +1,146 @@
+{# ===========================================================================
+   Formulario base de cadastro de pessoas.
+
+   Traz os blocos comuns (dados pessoais, documentos, contato, endereco,
+   foto, situacao). Cada modulo estende este template e preenche o bloco
+   ``campos_especificos`` com o que e proprio do seu dominio — registro
+   funcional do professor, cargo do funcionario, profissao do responsavel.
+   =========================================================================== #}
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, resumo_erros %}
+
+{% block titulo %}{{ ('Editar ' ~ ctx.titulo | lower) if registro else ('Novo ' ~ ctx.titulo | lower) }}{% endblock %}
+{% block titulo_pagina %}{{ ('Editar ' ~ ctx.titulo | lower) if registro else ('Novo ' ~ ctx.titulo | lower) }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ url_for(ctx.endpoints.listar) }}">{{ ctx.titulo_plural }}</a>
+      </li>
+      {% if registro %}
+        <li class="breadcrumb-item">
+          <a href="{{ url_for(ctx.endpoints.detalhe, **{ctx.parametro_id: registro.id}) }}">
+            {{ registro.nome_exibicao }}
+          </a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">Editar</li>
+      {% else %}
+        <li class="breadcrumb-item active" aria-current="page">Novo</li>
+      {% endif %}
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" enctype="multipart/form-data" novalidate data-avisar-saida>
+  {{ form.hidden_tag() }}
+  {{ resumo_erros(form) }}
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+
+      {# --- Dados pessoais --- #}
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person text-primary"></i> Dados pessoais</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.nome_completo, coluna='col-12') }}
+            {{ campo(form.nome_social, coluna='col-12 col-md-6') }}
+            {{ campo(form.data_nascimento, coluna='col-6 col-md-3') }}
+            {{ selecao(form.sexo, coluna='col-6 col-md-3') }}
+            {% if form.estado_civil is defined %}
+              {{ selecao(form.estado_civil, coluna='col-12 col-md-4') }}
+            {% endif %}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-card-text"></i> Documentos
+            </div>
+            <div class="row g-3">
+              {{ campo(form.cpf, coluna='col-12 col-md-4', mascara='cpf') }}
+              {{ campo(form.rg, coluna='col-6 col-md-4') }}
+              {{ campo(form.rg_orgao_emissor, coluna='col-6 col-md-4') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# --- Campos especificos de cada cadastro --- #}
+      {% block campos_especificos %}{% endblock %}
+
+      {# --- Contato e endereco --- #}
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-telephone text-primary"></i> Contato e endereco</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.celular, coluna='col-12 col-md-4', mascara='telefone') }}
+            {{ campo(form.telefone, coluna='col-12 col-md-4', mascara='telefone') }}
+            {{ campo(form.email, coluna='col-12 col-md-4',
+                     ajuda='Usado tambem como login, caso uma conta de acesso seja criada.') }}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-house"></i> Endereco residencial
+            </div>
+            <div class="row g-3">
+              {{ campo(form.cep, coluna='col-6 col-md-3', mascara='cep') }}
+              {{ campo(form.logradouro, coluna='col-12 col-md-6') }}
+              {{ campo(form.numero, coluna='col-6 col-md-3') }}
+              {{ campo(form.complemento, coluna='col-12 col-md-4') }}
+              {{ campo(form.bairro, coluna='col-12 col-md-4') }}
+              {{ campo(form.cidade, coluna='col-8 col-md-3') }}
+              {{ selecao(form.uf, coluna='col-4 col-md-1') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# --- Coluna lateral --- #}
+    <div class="col-12 col-xl-4">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-image text-primary"></i> Foto</div>
+        <div class="card-body text-center">
+          {% if registro and registro.foto %}
+            <img src="{{ url_for('static', filename='uploads/' ~ ctx.pasta_fotos ~ '/' ~ registro.foto) }}"
+                 alt="Foto de {{ registro.nome_exibicao }}" class="sge-avatar sge-avatar--lg mb-3">
+          {% else %}
+            <div class="sge-avatar sge-avatar--lg mx-auto mb-3"><i class="bi bi-person"></i></div>
+          {% endif %}
+
+          {{ form.foto(class="form-control" + (" is-invalid" if form.foto.errors else "")) }}
+          {% if form.foto.errors %}
+            <div class="invalid-feedback d-block text-start">{{ form.foto.errors[0] }}</div>
+          {% endif %}
+          <div class="form-text text-start mt-2">
+            PNG, JPG ou WEBP. Metadados da imagem sao removidos ao salvar.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-info-circle text-primary"></i> Situacao</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.situacao, coluna='col-12') }}
+            {{ area_texto(form.observacoes, coluna='col-12', linhas=4) }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar
+          </button>
+          <a href="{{ url_for(ctx.endpoints.detalhe, **{ctx.parametro_id: registro.id}) if registro else url_for(ctx.endpoints.listar) }}"
+             class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

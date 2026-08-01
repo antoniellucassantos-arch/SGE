@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block titulo %}{{ usuario.nome_completo }}{% endblock %}
+{% block titulo_pagina %}Conta de acesso{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('usuarios.listar') }}">Usuarios</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ usuario.nome_completo }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.USUARIO_EDITAR) %}
+    <a href="{{ url_for('usuarios.editar', usuario_id=usuario.id) }}" class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Editar
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Identificacao --- #}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      {% if usuario.foto %}
+        <img src="{{ url_for('static', filename='uploads/usuarios/' ~ usuario.foto) }}"
+             alt="" class="sge-avatar sge-avatar--lg">
+      {% else %}
+        <span class="sge-avatar sge-avatar--lg">{{ usuario.iniciais }}</span>
+      {% endif %}
+      <div class="min-w-0 flex-grow-1">
+        <h2 class="h5 mb-1 sge-quebra">{{ usuario.nome_completo }}</h2>
+        <div class="small sge-texto-suave sge-quebra">{{ usuario.email }}</div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <span class="badge sge-badge-suave text-bg-{{ usuario.papel.cor }}">
+            {{ usuario.papel.rotulo }}
+          </span>
+          {% if usuario.esta_bloqueado %}
+            <span class="badge sge-badge-suave text-bg-warning">
+              <i class="bi bi-lock-fill me-1"></i>Bloqueada
+              ({{ usuario.minutos_restantes_bloqueio }} min)
+            </span>
+          {% elif usuario.ativo %}
+            <span class="badge sge-badge-suave text-bg-success">Ativa</span>
+          {% else %}
+            <span class="badge sge-badge-suave text-bg-secondary">Inativa</span>
+          {% endif %}
+          {% if usuario.deve_trocar_senha %}
+            <span class="badge sge-badge-suave text-bg-warning">
+              <i class="bi bi-key me-1"></i>Troca de senha pendente
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {# --- Dados e acessos --- #}
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-info-circle text-primary"></i> Dados da conta</div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 sge-texto-suave">CPF</dt>
+            <dd class="col-7 sge-numerico">{{ usuario.cpf | cpf }}</dd>
+            <dt class="col-5 sge-texto-suave">Telefone</dt>
+            <dd class="col-7 sge-numerico">{{ usuario.telefone | telefone }}</dd>
+            <dt class="col-5 sge-texto-suave">Criada em</dt>
+            <dd class="col-7 sge-numerico">{{ usuario.criado_em | data_hora }}</dd>
+            <dt class="col-5 sge-texto-suave">Ultimo acesso</dt>
+            <dd class="col-7">
+              {% if usuario.ultimo_login_em %}
+                <span class="sge-numerico">{{ usuario.ultimo_login_em | data_hora }}</span>
+                {% if usuario.ultimo_login_ip %}
+                  <div class="sge-texto-fraco">IP {{ usuario.ultimo_login_ip }}</div>
+                {% endif %}
+              {% else %}
+                <span class="sge-texto-fraco">Nunca acessou</span>
+              {% endif %}
+            </dd>
+            <dt class="col-5 sge-texto-suave">Senha alterada</dt>
+            <dd class="col-7 sge-numerico">{{ usuario.senha_alterada_em | data_hora }}</dd>
+            <dt class="col-5 sge-texto-suave">Perfil vinculado</dt>
+            <dd class="col-7">
+              {% set perfil = usuario.perfil_vinculado %}
+              {% if perfil %}
+                {{ perfil.nome_exibicao }}
+              {% else %}
+                <span class="sge-texto-fraco">Nenhum cadastro vinculado</span>
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    {# --- Permissoes efetivas --- #}
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-key text-primary"></i> Permissoes do perfil
+          <span class="badge sge-badge-suave ms-2">{{ permissoes | length }}</span>
+        </div>
+        <div class="card-body" style="max-height: 320px; overflow-y: auto;">
+          {% if '*' in permissoes %}
+            <div class="alert alert-danger mb-0" role="alert">
+              <i class="bi bi-shield-fill-exclamation flex-shrink-0"></i>
+              <div class="flex-grow-1 small">
+                <strong>Acesso irrestrito.</strong>
+                O perfil de administrador possui todas as permissoes do sistema.
+              </div>
+            </div>
+          {% else %}
+            <div class="d-flex flex-wrap gap-1">
+              {% for permissao in permissoes %}
+                <span class="badge sge-badge-suave" style="font-weight:500;">
+                  {{ permissao }}
+                </span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        <div class="card-footer small sge-texto-suave">
+          <i class="bi bi-info-circle me-1"></i>
+          As permissoes vem do perfil e nao podem ser editadas por conta.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Acoes administrativas --- #}
+  {% if tem_permissao(Permissao.USUARIO_EDITAR)
+     or tem_permissao(Permissao.USUARIO_REDEFINIR_SENHA) %}
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-gear text-primary"></i> Acoes administrativas</div>
+      <div class="card-body d-flex flex-wrap gap-2">
+
+        {% if tem_permissao(Permissao.USUARIO_REDEFINIR_SENHA) %}
+          <form method="post" action="{{ url_for('usuarios.redefinir_senha', usuario_id=usuario.id) }}"
+                data-confirmar
+                data-confirmar-titulo="Redefinir senha"
+                data-confirmar-texto="Uma nova senha temporaria sera gerada e exibida uma unica vez. A troca sera obrigatoria no proximo acesso."
+                data-confirmar-botao="Redefinir senha"
+                data-confirmar-cor="warning">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-warning">
+              <i class="bi bi-key"></i> Redefinir senha
+            </button>
+          </form>
+        {% endif %}
+
+        {% if usuario.esta_bloqueado and tem_permissao(Permissao.USUARIO_EDITAR) %}
+          <form method="post" action="{{ url_for('usuarios.desbloquear', usuario_id=usuario.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary">
+              <i class="bi bi-unlock"></i> Desbloquear conta
+            </button>
+          </form>
+        {% endif %}
+
+        {% if tem_permissao(Permissao.USUARIO_EDITAR) and usuario.id != current_user.id %}
+          <form method="post" action="{{ url_for('usuarios.alternar_ativacao', usuario_id=usuario.id) }}"
+                data-confirmar
+                data-confirmar-titulo="{{ 'Desativar conta' if usuario.ativo else 'Ativar conta' }}"
+                data-confirmar-texto="{{ 'O usuario perdera o acesso ao sistema imediatamente.' if usuario.ativo else 'O usuario podera acessar o sistema novamente.' }}"
+                data-confirmar-botao="Confirmar"
+                data-confirmar-cor="{{ 'danger' if usuario.ativo else 'primary' }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-{{ 'danger' if usuario.ativo else 'success' }}">
+              <i class="bi bi-{{ 'x-circle' if usuario.ativo else 'check-circle' }}"></i>
+              {{ 'Desativar conta' if usuario.ativo else 'Ativar conta' }}
+            </button>
+          </form>
+        {% endif %}
+
+        {% if tem_permissao(Permissao.USUARIO_EXCLUIR) and usuario.id != current_user.id %}
+          <form method="post" action="{{ url_for('usuarios.excluir', usuario_id=usuario.id) }}"
+                class="ms-auto"
+                data-confirmar
+                data-confirmar-titulo="Excluir conta"
+                data-confirmar-texto="A conta sera excluida e o acesso revogado. O historico de auditoria e preservado."
+                data-confirmar-botao="Excluir conta">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+              <i class="bi bi-trash"></i> Excluir conta
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Historico --- #}
+  {% if historico %}
+    <div class="card mt-3">
+      <div class="card-header">
+        <i class="bi bi-clock-history text-primary"></i> Historico da conta
+      </div>
+      <div class="card-body">
+        <div class="sge-timeline">
+          {% for registro in historico %}
+            <div class="sge-timeline__item">
+              <div class="sge-timeline__ponto"></div>
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="min-w-0">
+                  <div class="small fw-semibold sge-quebra">
+                    {{ registro.descricao or registro.acao.rotulo }}
+                  </div>
+                  <div class="small sge-texto-fraco">{{ registro.nome_responsavel }}</div>
+                </div>
+                <span class="small sge-texto-fraco text-nowrap">
+                  {{ registro.criado_em | tempo_relativo }}
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

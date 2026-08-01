@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, caixa, resumo_erros %}
+
+{% block titulo %}{{ 'Editar aviso' if aviso else 'Novo aviso' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar aviso' if aviso else 'Novo aviso' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('avisos.listar') }}">Avisos</a></li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {{ aviso.titulo | truncar(40) if aviso else 'Novo' }}
+      </li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" novalidate data-avisar-saida>
+  {{ form.hidden_tag() }}
+  {{ resumo_erros(form) }}
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-megaphone text-primary"></i> Conteudo do aviso
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.titulo, coluna='col-12') }}
+            {{ campo(form.resumo, coluna='col-12',
+                     ajuda='Se vazio, o sistema usa o inicio da mensagem.') }}
+            {{ area_texto(form.mensagem, coluna='col-12', linhas=10) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-people text-primary"></i> Destinatarios
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.publico, coluna='col-12',
+                       ajuda='Define quem vera o aviso no sistema.') }}
+            {{ selecao(form.turma_id, coluna='col-12',
+                       ajuda='Obrigatorio quando o publico e uma turma especifica.') }}
+            {{ selecao(form.prioridade, coluna='col-12') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-calendar-range text-primary"></i> Vigencia
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.data_inicio, coluna='col-12') }}
+            {{ campo(form.data_fim, coluna='col-12',
+                     ajuda='Deixe vazio para o aviso nao expirar.') }}
+            {{ caixa(form.publicado, coluna='col-12',
+                     ajuda='Desmarque para salvar como rascunho.') }}
+            {{ caixa(form.fixado, coluna='col-12',
+                     ajuda='Avisos fixados aparecem no topo da lista.') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar aviso
+          </button>
+          <a href="{{ url_for('avisos.detalhe', aviso_id=aviso.id) if aviso else url_for('avisos.listar') }}"
+             class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

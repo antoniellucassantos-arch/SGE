@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, caixa, area_texto %}
+
+{% block titulo %}Estrutura{% endblock %}
+{% block titulo_pagina %}Configuracoes{% endblock %}
+
+{% block subtitulo %}
+  <p>Series, salas e tempos de aula usados na montagem das turmas e horarios.</p>
+{% endblock %}
+
+{% block conteudo %}
+  {% include 'configuracoes/_navegacao.html' %}
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aba-series"
+              type="button" role="tab">
+        <i class="bi bi-layers me-1"></i> Series
+        <span class="badge sge-badge-suave ms-1">{{ series | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-salas"
+              type="button" role="tab">
+        <i class="bi bi-door-open me-1"></i> Salas
+        <span class="badge sge-badge-suave ms-1">{{ salas | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-tempos"
+              type="button" role="tab">
+        <i class="bi bi-clock me-1"></i> Tempos de aula
+        <span class="badge sge-badge-suave ms-1">{{ tempos | length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    {# ---------------- Series ---------------- #}
+    <div class="tab-pane fade show active" id="aba-series" role="tabpanel">
+      <div class="row g-3">
+        {% if pode_editar %}
+          <div class="col-12 col-xl-4">
+            <div class="card">
+              <div class="card-header"><i class="bi bi-plus-square text-primary"></i> Nova serie</div>
+              <div class="card-body">
+                <form method="post" action="{{ url_for('configuracoes.salvar_serie') }}">
+                  {{ form_serie.hidden_tag() }}
+                  <div class="row g-3">
+                    {{ campo(form_serie.nome, coluna='col-12') }}
+                    {{ selecao(form_serie.nivel_ensino, coluna='col-12') }}
+                    {{ campo(form_serie.ordem, coluna='col-6',
+                             ajuda='Progressao pedagogica') }}
+                    {{ campo(form_serie.idade_recomendada, coluna='col-6') }}
+                    {{ caixa(form_serie.ativa, coluna='col-12') }}
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Salvar serie
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="col-12 {{ 'col-xl-8' if pode_editar else '' }}">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-layers text-primary"></i> Series cadastradas</div>
+            <div class="card-body p-0">
+              {% if series %}
+                <div class="sge-tabela-wrapper">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th class="text-center" style="width:56px;">Ordem</th>
+                        <th>Serie</th>
+                        <th class="d-none d-md-table-cell">Nivel</th>
+                        <th class="text-center d-none d-lg-table-cell">Idade</th>
+                        <th class="text-center">Situacao</th>
+                        {% if pode_editar %}<th class="sge-tabela-acoes">Acoes</th>{% endif %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for serie in series %}
+                        <tr>
+                          <td class="text-center sge-numerico small sge-texto-fraco">{{ serie.ordem }}</td>
+                          <td class="fw-semibold">{{ serie.nome }}</td>
+                          <td class="d-none d-md-table-cell">
+                            <span class="badge sge-badge-suave text-bg-{{ serie.nivel_ensino.cor }}">
+                              {{ serie.nivel_ensino.rotulo }}
+                            </span>
+                          </td>
+                          <td class="text-center d-none d-lg-table-cell sge-numerico small">
+                            {{ serie.idade_recomendada or '—' }}
+                          </td>
+                          <td class="text-center">
+                            <span class="badge sge-badge-suave text-bg-{{ 'success' if serie.ativa else 'secondary' }}">
+                              {{ 'Ativa' if serie.ativa else 'Inativa' }}
+                            </span>
+                          </td>
+                          {% if pode_editar %}
+                            <td class="sge-tabela-acoes">
+                              <form method="post" class="d-inline"
+                                    action="{{ url_for('configuracoes.excluir_serie', serie_id=serie.id) }}"
+                                    data-confirmar
+                                    data-confirmar-titulo="Excluir serie"
+                                    data-confirmar-texto="So e possivel excluir series sem turmas vinculadas."
+                                    data-confirmar-botao="Excluir">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                        data-bs-toggle="tooltip" title="Excluir">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              </form>
+                            </td>
+                          {% endif %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="sge-vazio">
+                  <i class="bi bi-layers"></i>
+                  <h5>Nenhuma serie cadastrada</h5>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- Salas ---------------- #}
+    <div class="tab-pane fade" id="aba-salas" role="tabpanel">
+      <div class="row g-3">
+        {% if pode_editar %}
+          <div class="col-12 col-xl-4">
+            <div class="card">
+              <div class="card-header"><i class="bi bi-plus-square text-primary"></i> Nova sala</div>
+              <div class="card-body">
+                <form method="post" action="{{ url_for('configuracoes.salvar_sala') }}">
+                  {{ form_sala.hidden_tag() }}
+                  <div class="row g-3">
+                    {{ campo(form_sala.nome, coluna='col-12') }}
+                    {{ campo(form_sala.bloco, coluna='col-6') }}
+                    {{ campo(form_sala.andar, coluna='col-6') }}
+                    {{ campo(form_sala.capacidade, coluna='col-6') }}
+                    {{ caixa(form_sala.possui_projetor, coluna='col-12') }}
+                    {{ caixa(form_sala.possui_ar_condicionado, coluna='col-12') }}
+                    {{ caixa(form_sala.acessivel, coluna='col-12') }}
+                    {{ caixa(form_sala.ativa, coluna='col-12') }}
+                    {{ area_texto(form_sala.observacoes, coluna='col-12', linhas=2) }}
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Salvar sala
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="col-12 {{ 'col-xl-8' if pode_editar else '' }}">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-door-open text-primary"></i> Salas cadastradas</div>
+            <div class="card-body p-0">
+              {% if salas %}
+                <div class="sge-tabela-wrapper">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Sala</th>
+                        <th class="d-none d-md-table-cell">Localizacao</th>
+                        <th class="text-center">Capacidade</th>
+                        <th class="text-center d-none d-lg-table-cell">Recursos</th>
+                        <th class="text-center">Situacao</th>
+                        {% if pode_editar %}<th class="sge-tabela-acoes">Acoes</th>{% endif %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for sala in salas %}
+                        <tr>
+                          <td class="fw-semibold">{{ sala.nome }}</td>
+                          <td class="d-none d-md-table-cell small sge-texto-suave">
+                            {{ sala.bloco or '—' }}{% if sala.andar %} / {{ sala.andar }}{% endif %}
+                          </td>
+                          <td class="text-center sge-numerico small">{{ sala.capacidade or '—' }}</td>
+                          <td class="text-center d-none d-lg-table-cell">
+                            {% if sala.possui_projetor %}
+                              <i class="bi bi-projector text-primary" data-bs-toggle="tooltip" title="Projetor"></i>
+                            {% endif %}
+                            {% if sala.possui_ar_condicionado %}
+                              <i class="bi bi-snow text-info ms-1" data-bs-toggle="tooltip" title="Ar-condicionado"></i>
+                            {% endif %}
+                            {% if sala.acessivel %}
+                              <i class="bi bi-universal-access text-success ms-1" data-bs-toggle="tooltip" title="Acessivel"></i>
+                            {% endif %}
+                          </td>
+                          <td class="text-center">
+                            <span class="badge sge-badge-suave text-bg-{{ 'success' if sala.ativa else 'secondary' }}">
+                              {{ 'Ativa' if sala.ativa else 'Inativa' }}
+                            </span>
+                          </td>
+                          {% if pode_editar %}
+                            <td class="sge-tabela-acoes">
+                              <form method="post" class="d-inline"
+                                    action="{{ url_for('configuracoes.excluir_sala', sala_id=sala.id) }}"
+                                    data-confirmar
+                                    data-confirmar-titulo="Excluir sala"
+                                    data-confirmar-texto="So e possivel excluir salas nao alocadas a turmas."
+                                    data-confirmar-botao="Excluir">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                        data-bs-toggle="tooltip" title="Excluir">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              </form>
+                            </td>
+                          {% endif %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="sge-vazio">
+                  <i class="bi bi-door-closed"></i>
+                  <h5>Nenhuma sala cadastrada</h5>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- Tempos de aula ---------------- #}
+    <div class="tab-pane fade" id="aba-tempos" role="tabpanel">
+      <div class="row g-3">
+        {% if pode_editar %}
+          <div class="col-12 col-xl-4">
+            <div class="card">
+              <div class="card-header">
+                <i class="bi bi-plus-square text-primary"></i> Novo tempo de aula
+              </div>
+              <div class="card-body">
+                <form method="post" action="{{ url_for('configuracoes.salvar_tempo') }}">
+                  {{ form_tempo.hidden_tag() }}
+                  <div class="row g-3">
+                    {{ selecao(form_tempo.turno, coluna='col-12') }}
+                    {{ campo(form_tempo.nome, coluna='col-8') }}
+                    {{ campo(form_tempo.ordem, coluna='col-4') }}
+                    {{ campo(form_tempo.hora_inicio, coluna='col-6') }}
+                    {{ campo(form_tempo.hora_fim, coluna='col-6') }}
+                    {{ caixa(form_tempo.e_intervalo, coluna='col-12',
+                             ajuda='Intervalos aparecem na grade mas nao recebem disciplina.') }}
+                    {{ caixa(form_tempo.ativo, coluna='col-12') }}
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Salvar tempo
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="col-12 {{ 'col-xl-8' if pode_editar else '' }}">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-clock text-primary"></i> Tempos cadastrados</div>
+            <div class="card-body p-0">
+              {% if tempos %}
+                <div class="sge-tabela-wrapper">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Turno</th>
+                        <th class="text-center" style="width:56px;">Ordem</th>
+                        <th>Nome</th>
+                        <th class="text-center">Horario</th>
+                        <th class="text-center d-none d-md-table-cell">Duracao</th>
+                        <th class="text-center">Tipo</th>
+                        {% if pode_editar %}<th class="sge-tabela-acoes">Acoes</th>{% endif %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for tempo in tempos %}
+                        <tr>
+                          <td>
+                            <span class="badge sge-badge-suave text-bg-{{ tempo.turno.cor }}">
+                              {{ tempo.turno.rotulo }}
+                            </span>
+                          </td>
+                          <td class="text-center sge-numerico small sge-texto-fraco">{{ tempo.ordem }}</td>
+                          <td class="fw-semibold small">{{ tempo.nome }}</td>
+                          <td class="text-center sge-numerico small">{{ tempo.faixa }}</td>
+                          <td class="text-center d-none d-md-table-cell sge-numerico small">
+                            {{ tempo.duracao_minutos }} min
+                          </td>
+                          <td class="text-center">
+                            {% if tempo.e_intervalo %}
+                              <span class="badge sge-badge-suave text-bg-warning">Intervalo</span>
+                            {% else %}
+                              <span class="badge sge-badge-suave text-bg-primary">Aula</span>
+                            {% endif %}
+                          </td>
+                          {% if pode_editar %}
+                            <td class="sge-tabela-acoes">
+                              <form method="post" class="d-inline"
+                                    action="{{ url_for('configuracoes.excluir_tempo', tempo_id=tempo.id) }}"
+                                    data-confirmar
+                                    data-confirmar-titulo="Excluir tempo de aula"
+                                    data-confirmar-texto="So e possivel excluir tempos sem alocacoes na grade."
+                                    data-confirmar-botao="Excluir">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                                        data-bs-toggle="tooltip" title="Excluir">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              </form>
+                            </td>
+                          {% endif %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="sge-vazio">
+                  <i class="bi bi-clock"></i>
+                  <h5>Nenhum tempo de aula cadastrado</h5>
+                  <p class="mb-0 small">
+                    Sem tempos de aula nao e possivel montar a grade de horarios.
+                  </p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

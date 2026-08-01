@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% set aluno = dados.aluno %}
+{% set matricula = dados.matricula %}
+{% set turma = dados.turma %}
+
+{% block titulo %}Boletim - {{ aluno.nome_exibicao }}{% endblock %}
+{% block titulo_pagina %}Boletim escolar{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      {% if current_user.e_equipe_interna %}
+        <li class="breadcrumb-item"><a href="{{ url_for('boletim.index') }}">Boletins</a></li>
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}">{{ aluno.nome_exibicao }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">Boletim</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.BOLETIM_EMITIR) %}
+    <a href="{{ url_for('boletim.pdf_aluno', aluno_id=aluno.id) }}"
+       class="btn btn-primary" target="_blank" rel="noopener">
+      <i class="bi bi-file-earmark-pdf"></i> Gerar PDF
+    </a>
+  {% endif %}
+  <button type="button" class="btn btn-light" data-imprimir>
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Identificacao --- #}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      {% if aluno.foto %}
+        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+             alt="" class="sge-avatar sge-avatar--lg sge-nao-imprimir">
+      {% endif %}
+      <div class="min-w-0 flex-grow-1">
+        <h2 class="h5 mb-1">{{ aluno.nome_exibicao }}</h2>
+        <div class="small sge-texto-suave">
+          Codigo {{ aluno.codigo }}
+          &middot; Matricula {{ matricula.numero }}
+          &middot; {{ turma.nome_completo if turma else 'Sem turma' }}
+          &middot; Ano letivo {{ dados.ano_letivo.ano if dados.ano_letivo }}
+        </div>
+      </div>
+      <div class="text-end">
+        <div class="sge-indicador__rotulo">Media geral</div>
+        <div class="h3 mb-0 sge-numerico text-{{ 'success' if (dados.media_geral or 0) >= 6 else 'danger' }}">
+          {{ dados.media_geral | nota if dados.media_geral is not none else '—' }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Tabela de notas --- #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-journal-text text-primary"></i> Desempenho por disciplina
+    </div>
+    <div class="card-body p-0">
+      {% if dados.linhas %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Disciplina</th>
+                {% for periodo in dados.periodos[:4] %}
+                  <th class="text-center">{{ periodo.nome | replace('Bimestre', 'Bim') }}</th>
+                {% endfor %}
+                <th class="text-center">Media</th>
+                <th class="text-center d-none d-md-table-cell">Faltas</th>
+                <th class="text-center d-none d-md-table-cell">Freq.</th>
+                <th class="text-center">Situacao</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for linha in dados.linhas %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="sge-ponto"
+                            style="background: {{ linha.disciplina.cor if linha.disciplina else '#6c757d' }};"></span>
+                      <span class="fw-semibold">
+                        {{ linha.disciplina.nome if linha.disciplina else '?' }}
+                      </span>
+                    </div>
+                    {% if linha.professor %}
+                      <div class="small sge-texto-fraco d-none d-lg-block">
+                        {{ linha.professor.nome_exibicao }}
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  {% for indice in range(dados.periodos[:4] | length) %}
+                    {% set media = linha.medias[indice] if linha.medias | length > indice else None %}
+                    <td class="text-center sge-numerico">
+                      {% if media is not none %}
+                        <span class="{{ 'text-danger fw-semibold' if media < 6 }}">
+                          {{ media | nota }}
+                        </span>
+                      {% else %}
+                        <span class="sge-texto-fraco">—</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+
+                  <td class="text-center">
+                    {% if linha.media_final is not none %}
+                      <span class="badge sge-badge-suave text-bg-{{ 'success' if linha.media_final >= 6 else ('warning' if linha.media_final >= 4 else 'danger') }} sge-numerico">
+                        {{ linha.media_final | nota }}
+                      </span>
+                    {% else %}
+                      <span class="sge-texto-fraco">—</span>
+                    {% endif %}
+                  </td>
+
+                  <td class="text-center d-none d-md-table-cell sge-numerico small">
+                    {{ linha.faltas if linha.faltas is not none else '—' }}
+                  </td>
+                  <td class="text-center d-none d-md-table-cell sge-numerico small">
+                    {% if linha.frequencia is not none %}
+                      <span class="{{ 'text-danger fw-semibold' if linha.frequencia < 75 }}">
+                        {{ linha.frequencia | percentual(0) }}
+                      </span>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="text-center">
+                    <span class="badge sge-badge-suave text-bg-{{ linha.situacao.cor }}">
+                      {{ linha.situacao.rotulo }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-journal"></i>
+          <h5>Nenhuma disciplina atribuida</h5>
+          <p class="mb-0 small">
+            A turma ainda nao possui disciplinas na grade curricular.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card-footer">
+      <div class="row g-3 small">
+        <div class="col-6 col-md-3">
+          <span class="sge-texto-suave">Media geral:</span>
+          <strong class="sge-numerico ms-1">
+            {{ dados.media_geral | nota if dados.media_geral is not none else '—' }}
+          </strong>
+        </div>
+        <div class="col-6 col-md-3">
+          <span class="sge-texto-suave">Frequencia:</span>
+          <strong class="sge-numerico ms-1">
+            {{ dados.frequencia_geral | percentual if dados.frequencia_geral is not none else '—' }}
+          </strong>
+        </div>
+        <div class="col-12 col-md-3">
+          <span class="sge-texto-suave">Resultado:</span>
+          <span class="badge sge-badge-suave text-bg-{{ matricula.resultado_final.cor }} ms-1">
+            {{ matricula.resultado_final.rotulo }}
+          </span>
+        </div>
+        <div class="col-12 col-md-3 sge-texto-fraco">
+          Media minima:
+          {{ dados.ano_letivo.media_aprovacao | nota if dados.ano_letivo else '6,0' }}
+          &middot; Frequencia minima:
+          {{ dados.ano_letivo.frequencia_minima | percentual(0) if dados.ano_letivo else '75%' }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if dados.frequencia_geral is not none and dados.frequencia_geral < 75 %}
+    <div class="alert alert-danger mt-3" role="alert">
+      <i class="bi bi-exclamation-octagon-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Atencao: frequencia abaixo do minimo legal.</strong>
+        A LDB exige 75% de frequencia para aprovacao.
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Horarios - {{ turma.identificacao_curta }}{% endblock %}
+{% block titulo_pagina %}Grade de horarios{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('horarios.index') }}">Horarios</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ turma.identificacao_curta }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    {{ turma.nome_completo }}
+    {% if turma.sala %} &middot; sala {{ turma.sala.nome }}{% endif %}
+  </p>
+{% endblock %}
+
+{% block acoes %}
+  <button type="button" class="btn btn-light" data-imprimir>
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+  {% if pode_editar and grade.matriz %}
+    <form method="post" action="{{ url_for('horarios.limpar', turma_id=turma.id) }}"
+          class="d-inline"
+          data-confirmar
+          data-confirmar-titulo="Limpar grade"
+          data-confirmar-texto="Todas as alocacoes de horario desta turma serao removidas."
+          data-confirmar-botao="Limpar grade">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="bi bi-eraser"></i> Limpar grade
+      </button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if not grade.tempos %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Nenhum tempo de aula cadastrado para o turno
+        <strong>{{ turma.turno.rotulo }}</strong>.
+        Configure os tempos de aula antes de montar a grade.
+      </div>
+    </div>
+  {% else %}
+
+    {# --- Grade semanal --- #}
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-calendar-week text-primary"></i> Grade semanal
+      </div>
+      <div class="card-body">
+        <div class="sge-tabela-wrapper">
+          <table class="sge-grade-horarios">
+            <thead>
+              <tr>
+                <th style="min-width:110px;">Horario</th>
+                {% for dia in grade.dias %}
+                  <th>
+                    <span class="d-none d-md-inline">{{ dia.rotulo }}</span>
+                    <span class="d-md-none">{{ dia.abreviacao }}</span>
+                  </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for tempo in grade.tempos %}
+                <tr>
+                  <th style="text-align:left;">
+                    <div>{{ tempo.nome }}</div>
+                    <div class="fw-normal sge-texto-fraco" style="font-size:.68rem;">
+                      {{ tempo.faixa }}
+                    </div>
+                  </th>
+
+                  {% if tempo.e_intervalo %}
+                    <td colspan="{{ grade.dias | length }}"
+                        style="background: var(--sge-alerta-suave); color: var(--sge-alerta);">
+                      <i class="bi bi-cup-hot me-1"></i> {{ tempo.nome }}
+                    </td>
+                  {% else %}
+                    {% for dia in grade.dias %}
+                      {% set horario = grade.matriz.get(tempo.id, {}).get(dia.value) %}
+                      <td>
+                        {% if horario %}
+                          <div class="sge-aula p-2 rounded position-relative"
+                               style="background: {{ horario.cor }};">
+                            <div>{{ horario.nome_disciplina | truncar(18, '') }}</div>
+                            {% if horario.professor %}
+                              <small class="d-block">
+                                {{ horario.professor.primeiro_nome }}
+                              </small>
+                            {% endif %}
+                            {% if horario.sala_efetiva %}
+                              <small class="d-block">
+                                <i class="bi bi-geo-alt"></i> {{ horario.sala_efetiva.nome }}
+                              </small>
+                            {% endif %}
+
+                            {% if pode_editar %}
+                              <form method="post" class="position-absolute top-0 end-0 sge-nao-imprimir"
+                                    action="{{ url_for('horarios.remover', horario_id=horario.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit"
+                                        class="btn btn-sm p-0 px-1 text-white border-0 bg-transparent"
+                                        style="line-height:1;"
+                                        data-bs-toggle="tooltip" title="Remover">
+                                  <i class="bi bi-x"></i>
+                                </button>
+                              </form>
+                            {% endif %}
+                          </div>
+                        {% else %}
+                          <span class="sge-texto-fraco">—</span>
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {# --- Alocar disciplina --- #}
+    {% if pode_editar %}
+      <div class="card mb-3 sge-nao-imprimir">
+        <div class="card-header">
+          <i class="bi bi-plus-square text-primary"></i> Alocar disciplina
+        </div>
+        <div class="card-body">
+          {% if turma.turmas_disciplinas %}
+            <form method="post" action="{{ url_for('horarios.alocar', turma_id=turma.id) }}"
+                  class="row g-3 align-items-end">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+              <div class="col-12 col-md-4">
+                <label class="form-label sge-obrigatorio" for="turma_disciplina_id">Disciplina</label>
+                <select class="form-select" name="turma_disciplina_id" id="turma_disciplina_id" required>
+                  <option value="">Selecione</option>
+                  {% for vinculo in turma.turmas_disciplinas if vinculo.ativa %}
+                    <option value="{{ vinculo.id }}">
+                      {{ vinculo.disciplina.nome if vinculo.disciplina }}
+                      ({{ vinculo.nome_professor }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-6 col-md-2">
+                <label class="form-label sge-obrigatorio" for="dia_semana">Dia</label>
+                <select class="form-select" name="dia_semana" id="dia_semana" required>
+                  {% for dia in grade.dias %}
+                    <option value="{{ dia.value }}">{{ dia.rotulo }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <label class="form-label sge-obrigatorio" for="tempo_aula_id">Tempo</label>
+                <select class="form-select" name="tempo_aula_id" id="tempo_aula_id" required>
+                  {% for tempo in grade.tempos if not tempo.e_intervalo %}
+                    <option value="{{ tempo.id }}">{{ tempo.nome }} ({{ tempo.faixa }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-6 col-md-2">
+                <label class="form-label" for="sala_id">Sala</label>
+                <select class="form-select" name="sala_id" id="sala_id">
+                  <option value="">Sala da turma</option>
+                  {% for sala in salas %}
+                    <option value="{{ sala.id }}">{{ sala.identificacao }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-6 col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                  <i class="bi bi-plus-lg"></i>
+                </button>
+              </div>
+            </form>
+            <p class="form-text mb-0 mt-2">
+              <i class="bi bi-shield-check me-1"></i>
+              O sistema recusa a alocacao se o professor ou a sala ja
+              estiverem ocupados no mesmo dia e horario.
+            </p>
+          {% else %}
+            <p class="mb-0 small sge-texto-suave">
+              <i class="bi bi-info-circle me-1"></i>
+              Esta turma ainda nao possui disciplinas na grade curricular.
+              <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) }}">
+                Atribuir disciplinas
+              </a>.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    {# --- Conferencia de carga horaria --- #}
+    {% if resumo %}
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-clipboard-check text-primary"></i> Conferencia de carga horaria
+        </div>
+        <div class="card-body p-0">
+          <div class="sge-tabela-wrapper">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Disciplina</th>
+                  <th class="text-center">Previsto</th>
+                  <th class="text-center">Alocado</th>
+                  <th class="text-center">Situacao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in resumo %}
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="sge-ponto"
+                              style="background: {{ item.disciplina.cor if item.disciplina else '#6c757d' }};"></span>
+                        <span class="fw-semibold small">
+                          {{ item.disciplina.nome if item.disciplina else '?' }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="text-center sge-numerico">{{ item.previsto }}</td>
+                    <td class="text-center sge-numerico">{{ item.alocado }}</td>
+                    <td class="text-center">
+                      {% if item.completo %}
+                        <span class="badge sge-badge-suave text-bg-success">
+                          <i class="bi bi-check-lg"></i> Completo
+                        </span>
+                      {% elif item.diferenca < 0 %}
+                        <span class="badge sge-badge-suave text-bg-warning">
+                          Faltam {{ -item.diferenca }} aula(s)
+                        </span>
+                      {% else %}
+                        <span class="badge sge-badge-suave text-bg-danger">
+                          {{ item.diferenca }} aula(s) a mais
+                        </span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+  {% endif %}
+{% endblock %}

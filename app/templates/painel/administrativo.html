@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% from 'componentes/indicador.html' import indicador, indicador_progresso, indicador_alerta %}
+
+{% block titulo %}Painel{% endblock %}
+{% block titulo_pagina %}Painel{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    Visao geral da escola
+    {% if ano_letivo_atual %}no ano letivo de {{ ano_letivo_atual.ano }}{% endif %}.
+  </p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.MATRICULA_CRIAR) %}
+    <a href="{{ url_for('matriculas.nova') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Nova matricula
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.RELATORIO_ACADEMICO) %}
+    <a href="{{ url_for('relatorios.index') }}" class="btn btn-light">
+      <i class="bi bi-graph-up"></i> Relatorios
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if not ano_letivo_atual %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Nenhum ano letivo definido como corrente.</strong>
+        Os indicadores ficam indisponiveis ate que um ano letivo seja ativado
+        nas configuracoes do sistema.
+      </div>
+    </div>
+  {% endif %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Indicadores principais                                             #}
+  {# ------------------------------------------------------------------ #}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      {{ indicador('Alunos ativos', indicadores.alunos, 'bi-people-fill', 'primaria',
+                   url_for('alunos.listar') if tem_permissao(Permissao.ALUNO_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Professores', indicadores.professores, 'bi-person-video3', 'sucesso',
+                   url_for('professores.listar') if tem_permissao(Permissao.PROFESSOR_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Turmas', indicadores.turmas, 'bi-diagram-3-fill', 'info',
+                   url_for('turmas.listar') if tem_permissao(Permissao.TURMA_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Matriculas ativas', indicadores.matriculas, 'bi-file-earmark-text-fill', 'alerta',
+                   url_for('matriculas.listar') if tem_permissao(Permissao.MATRICULA_VISUALIZAR) else None) }}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      {{ indicador('Funcionarios', indicadores.funcionarios, 'bi-person-badge', 'neutro',
+                   url_for('funcionarios.listar') if tem_permissao(Permissao.FUNCIONARIO_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Responsaveis', indicadores.responsaveis, 'bi-person-heart', 'neutro',
+                   url_for('responsaveis.listar') if tem_permissao(Permissao.RESPONSAVEL_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Usuarios do sistema', indicadores.usuarios, 'bi-shield-lock', 'neutro',
+                   url_for('usuarios.listar') if tem_permissao(Permissao.USUARIO_VISUALIZAR) else None) }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador_progresso(
+           'Ocupacao das turmas',
+           complementares.taxa_ocupacao ~ '%',
+           complementares.taxa_ocupacao,
+           'bi-pie-chart-fill',
+           'primaria',
+           complementares.vagas_disponiveis ~ ' vagas disponiveis') }}
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Alertas operacionais                                               #}
+  {# ------------------------------------------------------------------ #}
+  {% if complementares.chamadas_pendentes or complementares.alunos_risco_frequencia %}
+    <div class="row g-3 mb-4">
+      {% if complementares.chamadas_pendentes %}
+        <div class="col-12 col-lg-6">
+          {{ indicador_alerta('Chamadas pendentes (30 dias)',
+                              complementares.chamadas_pendentes,
+                              'bi-calendar-x',
+                              url_for('frequencia.pendentes'),
+                              'alerta') }}
+        </div>
+      {% endif %}
+      {% if complementares.alunos_risco_frequencia %}
+        <div class="col-12 col-lg-6">
+          {{ indicador_alerta('Alunos com risco de frequencia',
+                              complementares.alunos_risco_frequencia,
+                              'bi-exclamation-triangle',
+                              url_for('relatorios.frequencia'),
+                              'perigo') }}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Graficos                                                           #}
+  {# ------------------------------------------------------------------ #}
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-8">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-bar-chart-fill text-primary"></i>
+          Alunos matriculados por serie
+        </div>
+        <div class="card-body">
+          <div class="sge-grafico">
+            <canvas data-grafico="barras"
+                    data-rotulos='{{ grafico_series.rotulos | tojson }}'
+                    data-valores='{{ grafico_series.valores | tojson }}'
+                    data-rotulo-serie="Alunos"
+                    aria-label="Grafico de alunos matriculados por serie"
+                    role="img"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-pie-chart-fill text-primary"></i>
+          Distribuicao por turno
+        </div>
+        <div class="card-body">
+          <div class="sge-grafico">
+            <canvas data-grafico="rosca"
+                    data-rotulos='{{ grafico_turnos.rotulos | tojson }}'
+                    data-valores='{{ grafico_turnos.valores | tojson }}'
+                    aria-label="Grafico de distribuicao de alunos por turno"
+                    role="img"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-8">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-graph-up-arrow text-primary"></i>
+          Matriculas realizadas por mes
+        </div>
+        <div class="card-body">
+          <div class="sge-grafico">
+            <canvas data-grafico="linha"
+                    data-rotulos='{{ grafico_matriculas.rotulos | tojson }}'
+                    data-valores='{{ grafico_matriculas.valores | tojson }}'
+                    data-rotulo-serie="Matriculas"
+                    aria-label="Grafico de matriculas realizadas por mes"
+                    role="img"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-clipboard-data text-primary"></i>
+          Situacao das matriculas
+        </div>
+        <div class="card-body">
+          <div class="sge-grafico">
+            <canvas data-grafico="rosca"
+                    data-rotulos='{{ grafico_situacoes.rotulos | tojson }}'
+                    data-valores='{{ grafico_situacoes.valores | tojson }}'
+                    data-cores='{{ grafico_situacoes.cores | tojson }}'
+                    aria-label="Grafico de situacao das matriculas"
+                    role="img"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Atividades e aniversariantes                                       #}
+  {# ------------------------------------------------------------------ #}
+  <div class="row g-3">
+    <div class="col-12 col-xl-7">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-activity text-primary"></i>
+          Atividades recentes
+          {% if tem_permissao(Permissao.AUDITORIA_VISUALIZAR) %}
+            <a href="{{ url_for('auditoria.listar') }}" class="ms-auto small fw-normal">
+              Ver auditoria completa
+            </a>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% if atividades %}
+            <div class="sge-timeline">
+              {% for registro in atividades %}
+                <div class="sge-timeline__item">
+                  <div class="sge-timeline__ponto"
+                       style="border-color: var(--sge-{{ 'sucesso' if registro.acao.cor == 'success'
+                                                      else 'perigo' if registro.acao.cor == 'danger'
+                                                      else 'alerta' if registro.acao.cor == 'warning'
+                                                      else 'primaria' }});"></div>
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="min-w-0">
+                      <div class="small fw-semibold sge-quebra">
+                        {{ registro.descricao or registro.acao.rotulo }}
+                      </div>
+                      <div class="small sge-texto-fraco">
+                        {{ registro.nome_responsavel }}
+                      </div>
+                    </div>
+                    <span class="small sge-texto-fraco text-nowrap">
+                      {{ registro.criado_em | tempo_relativo }}
+                    </span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="sge-vazio py-4">
+              <i class="bi bi-activity"></i>
+              <p class="mb-0 small">Nenhuma atividade registrada ainda.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+      <div class="card h-100">
+        <div class="card-header">
+          <i class="bi bi-cake2 text-primary"></i>
+          Aniversariantes do mes
+        </div>
+        <div class="card-body">
+          {% if aniversariantes %}
+            <div class="d-flex flex-column gap-3">
+              {% for aluno in aniversariantes %}
+                <div class="d-flex align-items-center gap-3">
+                  {% if aluno.foto %}
+                    <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                         alt="" class="sge-avatar sge-avatar--sm">
+                  {% else %}
+                    <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+                  {% endif %}
+                  <div class="min-w-0 flex-grow-1">
+                    <div class="small fw-semibold text-truncate">{{ aluno.nome_exibicao }}</div>
+                    <div class="small sge-texto-fraco">
+                      {{ aluno.turma_atual.identificacao_curta if aluno.turma_atual else 'Sem turma' }}
+                    </div>
+                  </div>
+                  <span class="badge sge-badge-suave text-nowrap">
+                    {{ aluno.data_nascimento.strftime('%d/%m') }}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="sge-vazio py-4">
+              <i class="bi bi-cake2"></i>
+              <p class="mb-0 small">Nenhum aniversariante neste mes.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/graficos.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'pessoas/formulario_base.html' %}
+{% from 'componentes/campo.html' import campo, selecao %}
+
+{% block campos_especificos %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-briefcase text-primary"></i> Dados funcionais
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ campo(form.matricula_funcional, coluna='col-12 col-md-4',
+                 ajuda='Deixe em branco para gerar automaticamente.') }}
+        {{ campo(form.cargo, coluna='col-12 col-md-5') }}
+        {{ selecao(form.setor, coluna='col-12 col-md-3') }}
+        {{ campo(form.data_admissao, coluna='col-6 col-md-4') }}
+        {{ campo(form.carga_horaria_semanal, coluna='col-6 col-md-4') }}
+        {% if registro %}
+          {{ campo(form.data_desligamento, coluna='col-6 col-md-4',
+                   ajuda='Preencher apenas em caso de desligamento.') }}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

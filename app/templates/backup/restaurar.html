@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Restaurar backup{% endblock %}
+{% block titulo_pagina %}Restaurar backup{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('backup.index') }}">Backup</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Restaurar</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-9">
+
+    <div class="alert alert-danger" role="alert">
+      <i class="bi bi-exclamation-octagon-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Operacao irreversivel.</strong>
+        A restauracao substitui <em>todo</em> o banco de dados atual pelo
+        conteudo do backup. Tudo que foi registrado depois desta copia sera
+        perdido: matriculas, notas, frequencia e comunicados.
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-file-earmark-zip text-primary"></i> Backup selecionado
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-4 col-md-3 sge-texto-suave">Arquivo</dt>
+          <dd class="col-8 col-md-9 sge-quebra">{{ backup.nome_arquivo }}</dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Gerado em</dt>
+          <dd class="col-8 col-md-9 sge-numerico">
+            {{ backup.criado_em | data_hora }}
+            <span class="sge-texto-fraco">({{ backup.criado_em | tempo_relativo }})</span>
+          </dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Tamanho</dt>
+          <dd class="col-8 col-md-9 sge-numerico">{{ backup.tamanho_legivel }}</dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Origem</dt>
+          <dd class="col-8 col-md-9">{{ backup.origem }}</dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Banco</dt>
+          <dd class="col-8 col-md-9">{{ instrucoes.banco }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-terminal text-primary"></i> Procedimento de restauracao
+      </div>
+      <div class="card-body">
+        <p class="small sge-texto-suave">
+          Por seguranca, a restauracao <strong>nao</strong> e executada pela
+          interface web. Ela exige acesso ao servidor, o que garante que uma
+          pessoa tecnica conduza o processo e que um backup do estado atual
+          seja feito antes.
+        </p>
+
+        <pre class="p-3 rounded small mb-0 sge-quebra"
+             style="background: var(--sge-lateral-fundo); color: #cbd5e1; overflow-x: auto;"><code>{{ instrucoes.comandos }}</code></pre>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-list-check text-primary"></i> Antes de restaurar
+      </div>
+      <div class="card-body">
+        <ol class="small sge-texto-suave mb-0 ps-3">
+          <li>Avise os usuarios e escolha um horario sem movimento na escola.</li>
+          <li>Pare a aplicacao para que ninguem grave dados durante o processo.</li>
+          <li>
+            <strong>Gere um backup do estado atual</strong> — se a restauracao
+            der errado, ele e o unico caminho de volta.
+          </li>
+          <li>Execute os comandos acima no servidor.</li>
+          <li>
+            Reinicie a aplicacao e rode <code>flask verificar-saude</code> para
+            confirmar que o banco esta integro.
+          </li>
+          <li>Confira algumas telas (alunos, notas, matriculas) antes de liberar o acesso.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{{ url_for('backup.baixar', backup_id=backup.id) }}" class="btn btn-primary">
+        <i class="bi bi-download"></i> Baixar este backup
+      </a>
+      <a href="{{ url_for('backup.index') }}" class="btn btn-light">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

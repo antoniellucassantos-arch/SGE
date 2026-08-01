@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, caixa, resumo_erros %}
+
+{% block titulo %}{{ 'Editar ano letivo' if ano else 'Novo ano letivo' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar ano letivo' if ano else 'Novo ano letivo' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('configuracoes.index') }}">Configuracoes</a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('configuracoes.anos_letivos') }}">Anos letivos</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {{ ano.ano if ano else 'Novo' }}
+      </li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-8">
+
+    {% if not ano %}
+      <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+        <div class="flex-grow-1">
+          Os periodos (bimestres ou trimestres) serao criados automaticamente
+          conforme a divisao definida em
+          <a href="{{ url_for('configuracoes.parametros') }}" class="alert-link">
+            Parametros academicos
+          </a>. Voce podera ajustar as datas depois.
+        </div>
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate data-avisar-saida>
+      {{ form.hidden_tag() }}
+      {{ resumo_erros(form) }}
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-calendar3 text-primary"></i> Periodo letivo
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.ano, coluna='col-6 col-md-3') }}
+            {{ campo(form.descricao, coluna='col-12 col-md-9') }}
+            {{ campo(form.data_inicio, coluna='col-6 col-md-4') }}
+            {{ campo(form.data_fim, coluna='col-6 col-md-4') }}
+            {{ selecao(form.situacao, coluna='col-12 col-md-4') }}
+            {{ caixa(form.corrente, coluna='col-12',
+                     ajuda='O ano corrente e o contexto padrao de todas as telas.') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-mortarboard text-primary"></i> Regras deste ano
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.media_aprovacao, coluna='col-6 col-md-4') }}
+            {{ campo(form.media_recuperacao, coluna='col-6 col-md-4') }}
+            {{ campo(form.frequencia_minima, coluna='col-6 col-md-4') }}
+          </div>
+          <p class="form-text mt-2 mb-0">
+            <i class="bi bi-shield-check me-1"></i>
+            Estas regras ficam congeladas neste ano letivo. Alterar os
+            parametros gerais no futuro nao afeta os resultados ja apurados aqui.
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar ano letivo
+          </button>
+          <a href="{{ url_for('configuracoes.anos_letivos') }}" class="btn btn-light">
+            Cancelar
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

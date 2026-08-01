@@ -1,0 +1,133 @@
+{# ===========================================================================
+   Menu de navegacao lateral.
+
+   Cada item so aparece se o usuario tiver a permissao correspondente. Isso e
+   apenas usabilidade — a rota continua protegida pelo decorador no servidor.
+   Esconder o link nunca substitui a verificacao de permissao.
+
+   O item ativo e detectado pelo blueprint da requisicao atual
+   (``request.blueprint``), o que mantem o destaque correto em todas as
+   subrotas de um modulo sem precisar listar cada endpoint.
+   =========================================================================== #}
+
+{% set bp_atual = request.blueprint %}
+
+{% macro item(endpoint, icone, rotulo, blueprint=None, badge=None) -%}
+  {% set alvo = blueprint or endpoint.split('.')[0] %}
+  <a href="{{ url_for(endpoint) }}"
+     class="sge-lateral__item {% if bp_atual == alvo %}ativo{% endif %}"
+     {% if bp_atual == alvo %}aria-current="page"{% endif %}>
+    <i class="bi {{ icone }}" aria-hidden="true"></i>
+    <span>{{ rotulo }}</span>
+    {% if badge %}<span class="badge text-bg-danger rounded-pill">{{ badge }}</span>{% endif %}
+  </a>
+{%- endmacro %}
+
+{# ------------------------------------------------------------------ #}
+{# Painel — visivel a todos os perfis                                 #}
+{# ------------------------------------------------------------------ #}
+{{ item('painel.index', 'bi-speedometer2', 'Painel') }}
+
+{# ------------------------------------------------------------------ #}
+{# Area do aluno e do responsavel                                     #}
+{# ------------------------------------------------------------------ #}
+{% if current_user.e_aluno or current_user.e_responsavel %}
+  <div class="sge-lateral__secao">Acompanhamento</div>
+  {{ item('boletim.meu_boletim', 'bi-journal-text', 'Boletim', blueprint='boletim') }}
+  {{ item('frequencia.minha_frequencia', 'bi-calendar-check', 'Frequencia', blueprint='frequencia') }}
+  {{ item('horarios.meu_horario', 'bi-clock-history', 'Horarios', blueprint='horarios') }}
+  {{ item('avisos.listar', 'bi-megaphone', 'Avisos', blueprint='avisos') }}
+{% endif %}
+
+{# ------------------------------------------------------------------ #}
+{# Area do professor                                                  #}
+{# ------------------------------------------------------------------ #}
+{% if current_user.e_professor %}
+  <div class="sge-lateral__secao">Minhas turmas</div>
+  {{ item('frequencia.index', 'bi-calendar-check', 'Diario de classe', blueprint='frequencia') }}
+  {{ item('notas.index', 'bi-pencil-square', 'Lancamento de notas', blueprint='notas') }}
+  {{ item('horarios.meu_horario', 'bi-clock-history', 'Meus horarios', blueprint='horarios') }}
+  {{ item('avisos.listar', 'bi-megaphone', 'Avisos', blueprint='avisos') }}
+{% endif %}
+
+{# ------------------------------------------------------------------ #}
+{# Area administrativa                                                #}
+{# ------------------------------------------------------------------ #}
+{% if current_user.e_equipe_interna and not current_user.e_professor %}
+
+  {% if tem_permissao(Permissao.ALUNO_VISUALIZAR)
+     or tem_permissao(Permissao.PROFESSOR_VISUALIZAR)
+     or tem_permissao(Permissao.FUNCIONARIO_VISUALIZAR)
+     or tem_permissao(Permissao.RESPONSAVEL_VISUALIZAR) %}
+    <div class="sge-lateral__secao">Cadastros</div>
+    {% if tem_permissao(Permissao.ALUNO_VISUALIZAR) %}
+      {{ item('alunos.listar', 'bi-people', 'Alunos', blueprint='alunos') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.PROFESSOR_VISUALIZAR) %}
+      {{ item('professores.listar', 'bi-person-video3', 'Professores', blueprint='professores') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.FUNCIONARIO_VISUALIZAR) %}
+      {{ item('funcionarios.listar', 'bi-person-badge', 'Funcionarios', blueprint='funcionarios') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.RESPONSAVEL_VISUALIZAR) %}
+      {{ item('responsaveis.listar', 'bi-person-heart', 'Responsaveis', blueprint='responsaveis') }}
+    {% endif %}
+  {% endif %}
+
+  {% if tem_permissao(Permissao.TURMA_VISUALIZAR) %}
+    <div class="sge-lateral__secao">Estrutura academica</div>
+    {{ item('turmas.listar', 'bi-diagram-3', 'Turmas', blueprint='turmas') }}
+    {% if tem_permissao(Permissao.DISCIPLINA_VISUALIZAR) %}
+      {{ item('disciplinas.listar', 'bi-book', 'Disciplinas', blueprint='disciplinas') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.HORARIO_VISUALIZAR) %}
+      {{ item('horarios.index', 'bi-clock-history', 'Horarios', blueprint='horarios') }}
+    {% endif %}
+  {% endif %}
+
+  {% if tem_permissao(Permissao.MATRICULA_VISUALIZAR) %}
+    <div class="sge-lateral__secao">Vida escolar</div>
+    {{ item('matriculas.listar', 'bi-file-earmark-text', 'Matriculas', blueprint='matriculas') }}
+    {% if tem_permissao(Permissao.FREQUENCIA_VISUALIZAR) %}
+      {{ item('frequencia.index', 'bi-calendar-check', 'Frequencia', blueprint='frequencia') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.NOTA_VISUALIZAR) %}
+      {{ item('notas.index', 'bi-pencil-square', 'Notas', blueprint='notas') }}
+    {% endif %}
+    {% if tem_permissao(Permissao.BOLETIM_VISUALIZAR) %}
+      {{ item('boletim.index', 'bi-journal-text', 'Boletins', blueprint='boletim') }}
+    {% endif %}
+  {% endif %}
+
+  <div class="sge-lateral__secao">Comunicacao</div>
+  {{ item('avisos.listar', 'bi-megaphone', 'Avisos', blueprint='avisos') }}
+
+  {% if tem_permissao(Permissao.RELATORIO_ACADEMICO)
+     or tem_permissao(Permissao.RELATORIO_ADMINISTRATIVO) %}
+    <div class="sge-lateral__secao">Relatorios</div>
+    {{ item('relatorios.index', 'bi-graph-up', 'Relatorios', blueprint='relatorios') }}
+  {% endif %}
+
+{% endif %}
+
+{# ------------------------------------------------------------------ #}
+{# Administracao do sistema                                           #}
+{# ------------------------------------------------------------------ #}
+{% if tem_permissao(Permissao.USUARIO_VISUALIZAR)
+   or tem_permissao(Permissao.CONFIGURACAO_VISUALIZAR)
+   or tem_permissao(Permissao.AUDITORIA_VISUALIZAR)
+   or tem_permissao(Permissao.BACKUP_EXECUTAR) %}
+  <div class="sge-lateral__secao">Sistema</div>
+  {% if tem_permissao(Permissao.USUARIO_VISUALIZAR) %}
+    {{ item('usuarios.listar', 'bi-shield-lock', 'Usuarios e acessos', blueprint='usuarios') }}
+  {% endif %}
+  {% if tem_permissao(Permissao.CONFIGURACAO_VISUALIZAR) %}
+    {{ item('configuracoes.index', 'bi-gear', 'Configuracoes', blueprint='configuracoes') }}
+  {% endif %}
+  {% if tem_permissao(Permissao.BACKUP_EXECUTAR) %}
+    {{ item('backup.index', 'bi-hdd', 'Backup', blueprint='backup') }}
+  {% endif %}
+  {% if tem_permissao(Permissao.AUDITORIA_VISUALIZAR) %}
+    {{ item('auditoria.listar', 'bi-clipboard-check', 'Auditoria', blueprint='auditoria') }}
+  {% endif %}
+{% endif %}

@@ -1,0 +1,121 @@
+{# ===========================================================================
+   Layout das telas publicas de autenticacao.
+
+   Nao herda de ``base.html`` porque nao existe usuario autenticado aqui:
+   nao ha barra lateral, menu nem avisos. Manter os dois layouts separados
+   evita uma cascata de ``{% if current_user.is_authenticated %}``.
+   =========================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a56db">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block titulo %}Acesso{% endblock %} &middot; {{ escola.nome_exibicao if escola else 'SGE' }}</title>
+
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sge.css') }}">
+</head>
+<body>
+
+<div class="sge-login">
+
+  {# --- Vitrine institucional (visivel apenas em telas grandes) --- #}
+  <div class="sge-login__vitrine">
+    <div style="max-width: 480px;">
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="sge-login__marca m-0" style="width:52px;height:52px;font-size:1.35rem;">
+          <i class="bi bi-mortarboard-fill"></i>
+        </div>
+        <div>
+          <div class="fs-5 fw-semibold">{{ escola.nome_exibicao if escola else 'SGE' }}</div>
+          <div class="small opacity-75">Sistema de Gestao Escolar</div>
+        </div>
+      </div>
+
+      <h2 class="fw-bold mb-3" style="font-size: 2rem; line-height: 1.25;">
+        A gestao da escola em um so lugar.
+      </h2>
+      <p class="mb-0 opacity-90" style="font-size: 1.02rem;">
+        Alunos, turmas, notas, frequencia e comunicacao integrados,
+        acessiveis de qualquer computador, tablet ou celular.
+      </p>
+
+      <ul class="sge-lista-beneficios">
+        <li>
+          <i class="bi bi-shield-check"></i>
+          <span>Dados protegidos e trilha de auditoria completa</span>
+        </li>
+        <li>
+          <i class="bi bi-phone"></i>
+          <span>Funciona no navegador do computador, tablet e celular</span>
+        </li>
+        <li>
+          <i class="bi bi-people"></i>
+          <span>Acesso separado para equipe, professores e responsaveis</span>
+        </li>
+        <li>
+          <i class="bi bi-clock-history"></i>
+          <span>Boletim e frequencia atualizados em tempo real</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  {# --- Formulario --- #}
+  <div class="sge-login__formulario">
+    <div class="sge-login__cartao">
+
+      {# Marca compacta, exibida quando a vitrine esta oculta #}
+      <div class="text-center d-lg-none">
+        {% if escola and escola.logo %}
+          <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+               alt="Logo da escola" class="sge-login__marca">
+        {% else %}
+          <div class="sge-login__marca"><i class="bi bi-mortarboard-fill"></i></div>
+        {% endif %}
+        <h1 class="h5 mb-1">{{ escola.nome_exibicao if escola else 'SGE' }}</h1>
+        <p class="sge-texto-fraco small mb-4">Sistema de Gestao Escolar</p>
+      </div>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+          {% for categoria, mensagem in mensagens %}
+            {% set icones = {
+              'success': 'bi-check-circle-fill',
+              'danger':  'bi-exclamation-octagon-fill',
+              'warning': 'bi-exclamation-triangle-fill',
+              'info':    'bi-info-circle-fill'
+            } %}
+            <div class="alert alert-{{ categoria if categoria in ['success','danger','warning','info'] else 'info' }} alert-dismissible fade show sge-quebra"
+                 role="alert">
+              <i class="bi {{ icones.get(categoria, 'bi-info-circle-fill') }} flex-shrink-0"></i>
+              <div class="flex-grow-1">{{ mensagem }}</div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          {% block conteudo %}{% endblock %}
+        </div>
+      </div>
+
+      <p class="text-center sge-texto-fraco small mt-4 mb-0">
+        {% block rodape %}
+          Problemas para acessar? Procure a secretaria da escola.
+        {% endblock %}
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sge.js') }}"></script>
+</body>
+</html>

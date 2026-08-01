@@ -1,0 +1,234 @@
+{# ===========================================================================
+   Layout base do SGE (area autenticada).
+
+   Estrutura: barra lateral fixa + barra superior + area de conteudo.
+   Em telas menores que 992px a barra lateral vira uma gaveta deslizante.
+
+   Blocos disponiveis para as paginas filhas:
+     titulo        -> titulo da aba do navegador
+     titulo_pagina -> titulo exibido no cabecalho da pagina
+     subtitulo     -> texto de apoio abaixo do titulo
+     navegacao     -> trilha de navegacao (breadcrumb)
+     acoes         -> botoes de acao no canto superior direito
+     conteudo      -> corpo da pagina
+     estilos       -> CSS adicional especifico da pagina
+     scripts       -> JS adicional especifico da pagina
+   =========================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  {# viewport-fit=cover respeita a area segura do iPhone com notch #}
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111c33">
+  <meta name="description" content="Sistema de Gestao Escolar">
+  {# O token vai no <head> para que o JS possa envia-lo em requisicoes AJAX #}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <title>{% block titulo %}{{ APP_NOME }}{% endblock %} &middot; {{ escola.nome_exibicao if escola else APP_NOME }}</title>
+
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sge.css') }}">
+  {% block estilos %}{% endblock %}
+</head>
+<body>
+
+<div class="sge-layout">
+
+  {# ---------------------------------------------------------------- #}
+  {# Barra lateral                                                    #}
+  {# ---------------------------------------------------------------- #}
+  <aside class="sge-lateral" id="barraLateral">
+    <div class="sge-lateral__marca">
+      {% if escola and escola.logo %}
+        <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+             alt="Logo da escola" class="sge-lateral__logo">
+      {% else %}
+        <div class="sge-lateral__logo" aria-hidden="true">
+          <i class="bi bi-mortarboard-fill"></i>
+        </div>
+      {% endif %}
+      <div class="overflow-hidden">
+        <div class="sge-lateral__titulo">{{ escola.nome_exibicao if escola else 'SGE' }}</div>
+        <div class="sge-lateral__subtitulo">
+          {% if ano_letivo_atual %}Ano letivo {{ ano_letivo_atual.ano }}{% else %}Gestao Escolar{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <nav class="sge-lateral__nav" aria-label="Menu principal">
+      {% include 'componentes/menu_lateral.html' %}
+    </nav>
+
+    <div class="sge-lateral__rodape">
+      {{ APP_NOME }} v{{ APP_VERSAO }}
+    </div>
+  </aside>
+
+  {# Camada escura exibida atras da gaveta em telas pequenas #}
+  <div class="sge-sobreposicao" id="sobreposicaoLateral" hidden></div>
+
+  {# ---------------------------------------------------------------- #}
+  {# Area principal                                                   #}
+  {# ---------------------------------------------------------------- #}
+  <div class="sge-principal">
+
+    <header class="sge-topo">
+      <button class="sge-topo__botao" id="alternarLateral"
+              type="button" aria-label="Alternar menu de navegacao"
+              aria-controls="barraLateral" aria-expanded="false">
+        <i class="bi bi-list"></i>
+      </button>
+
+      <h1 class="sge-topo__titulo d-none d-sm-block">
+        {% block titulo_pagina %}Painel{% endblock %}
+      </h1>
+
+      <div class="sge-topo__acoes">
+        {% block acoes_topo %}{% endblock %}
+
+        {# --- Avisos nao lidos --- #}
+        <div class="dropdown">
+          <button class="sge-topo__botao position-relative" type="button"
+                  data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                  aria-label="Avisos" aria-expanded="false">
+            <i class="bi bi-bell"></i>
+            {% if avisos_nao_lidos %}
+              <span class="position-absolute translate-middle badge rounded-pill text-bg-danger"
+                    style="top:8px; left:78%; font-size:.6rem;">
+                {{ avisos_nao_lidos if avisos_nao_lidos < 10 else '9+' }}
+                <span class="visually-hidden">avisos nao lidos</span>
+              </span>
+            {% endif %}
+          </button>
+          <div class="dropdown-menu dropdown-menu-end shadow" style="width:min(340px,90vw);">
+            <h6 class="dropdown-header d-flex justify-content-between align-items-center">
+              <span>Avisos</span>
+              {% if avisos_recentes %}
+                <a href="{{ url_for('avisos.listar') }}" class="small">Ver todos</a>
+              {% endif %}
+            </h6>
+            <div class="dropdown-divider"></div>
+            {% for aviso in avisos_recentes or [] %}
+              <a class="dropdown-item text-wrap py-2" href="{{ url_for('avisos.detalhe', aviso_id=aviso.id) }}">
+                <div class="d-flex align-items-start gap-2">
+                  <span class="sge-ponto bg-{{ aviso.prioridade.cor }} mt-2"></span>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="fw-semibold small text-truncate">{{ aviso.titulo }}</div>
+                    <div class="small sge-texto-fraco">{{ aviso.criado_em | tempo_relativo }}</div>
+                  </div>
+                </div>
+              </a>
+            {% else %}
+              <div class="px-3 py-4 text-center sge-texto-fraco small">
+                <i class="bi bi-inbox d-block fs-3 mb-2"></i>
+                Nenhum aviso novo
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# --- Menu do usuario --- #}
+        <div class="dropdown">
+          <button class="btn btn-link p-0 border-0 d-flex align-items-center gap-2"
+                  type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                  aria-label="Menu do usuario">
+            {% if current_user.foto %}
+              <img src="{{ url_for('static', filename='uploads/usuarios/' ~ current_user.foto) }}"
+                   alt="" class="sge-avatar">
+            {% else %}
+              <span class="sge-avatar">{{ current_user.iniciais }}</span>
+            {% endif %}
+            <span class="d-none d-lg-block text-start lh-sm">
+              <span class="d-block small fw-semibold text-dark">{{ current_user.primeiro_nome }}</span>
+              <span class="d-block sge-texto-fraco" style="font-size:.72rem;">{{ current_user.papel.rotulo }}</span>
+            </span>
+            <i class="bi bi-chevron-down small sge-texto-fraco d-none d-lg-block"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width:230px;">
+            <li class="px-3 py-2">
+              <div class="fw-semibold text-truncate">{{ current_user.nome_completo }}</div>
+              <div class="small sge-texto-fraco text-truncate">{{ current_user.email }}</div>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="{{ url_for('usuarios.perfil') }}">
+                <i class="bi bi-person me-2"></i>Meu perfil
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="{{ url_for('auth.alterar_senha') }}">
+                <i class="bi bi-key me-2"></i>Alterar senha
+              </a>
+            </li>
+            {% if tem_permissao(Permissao.CONFIGURACAO_VISUALIZAR) %}
+              <li>
+                <a class="dropdown-item" href="{{ url_for('configuracoes.index') }}">
+                  <i class="bi bi-gear me-2"></i>Configuracoes
+                </a>
+              </li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                <i class="bi bi-box-arrow-right me-2"></i>Sair
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <main class="sge-conteudo">
+
+      {# --- Mensagens do sistema --- #}
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+          <div class="mb-3">
+            {% for categoria, mensagem in mensagens %}
+              {% set icones = {
+                'success': 'bi-check-circle-fill',
+                'danger':  'bi-exclamation-octagon-fill',
+                'warning': 'bi-exclamation-triangle-fill',
+                'info':    'bi-info-circle-fill'
+              } %}
+              <div class="alert alert-{{ categoria if categoria in ['success','danger','warning','info'] else 'info' }} alert-dismissible fade show"
+                   role="alert">
+                <i class="bi {{ icones.get(categoria, 'bi-info-circle-fill') }} flex-shrink-0"></i>
+                <div class="flex-grow-1">{{ mensagem }}</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {# --- Cabecalho da pagina --- #}
+      {% block cabecalho %}
+        <div class="sge-cabecalho-pagina">
+          <div class="min-w-0">
+            {% block navegacao %}{% endblock %}
+            <h1>{{ self.titulo_pagina() }}</h1>
+            {% block subtitulo %}{% endblock %}
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            {% block acoes %}{% endblock %}
+          </div>
+        </div>
+      {% endblock %}
+
+      {% block conteudo %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{# Modal generico de confirmacao, usado por todas as acoes destrutivas #}
+{% include 'componentes/modal_confirmacao.html' %}
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sge.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

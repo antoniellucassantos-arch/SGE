@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, resumo_erros %}
+
+{% block titulo %}Nova matricula{% endblock %}
+{% block titulo_pagina %}Nova matricula{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('matriculas.listar') }}">Matriculas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Nova</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block subtitulo %}
+  <p>O numero da matricula e gerado automaticamente ao efetivar.</p>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-8">
+
+    {% if sem_turmas %}
+      <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+        <div class="flex-grow-1">
+          <strong>Nenhuma turma disponivel neste ano letivo.</strong>
+          Crie ao menos uma turma ativa antes de matricular alunos.
+          {% if tem_permissao(Permissao.TURMA_CRIAR) %}
+            <a href="{{ url_for('turmas.nova') }}" class="alert-link">Criar turma</a>.
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if sem_alunos %}
+      <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+        <div class="flex-grow-1">
+          <strong>Nenhum aluno disponivel para matricula.</strong>
+          Todos os alunos cadastrados ja possuem matricula ativa neste ano
+          letivo.
+          {% if tem_permissao(Permissao.ALUNO_CRIAR) %}
+            <a href="{{ url_for('alunos.novo') }}" class="alert-link">Cadastrar novo aluno</a>.
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate data-avisar-saida>
+      {{ form.hidden_tag() }}
+      {{ resumo_erros(form) }}
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-file-earmark-plus text-primary"></i> Dados da matricula
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.ano_letivo_id, coluna='col-12 col-md-4', ao_mudar=True,
+                       ajuda='Trocar o ano recarrega alunos e turmas disponiveis.') }}
+            {{ selecao(form.aluno_id, coluna='col-12 col-md-8',
+                       ajuda='Apenas alunos sem matricula ativa neste ano aparecem na lista.') }}
+            {{ selecao(form.turma_id, coluna='col-12 col-md-8',
+                       ajuda='Turmas lotadas sao sinalizadas e recusadas na validacao.') }}
+            {{ campo(form.data_matricula, coluna='col-12 col-md-4') }}
+          </div>
+
+          <div class="sge-secao-form">
+            <div class="sge-secao-form__titulo">
+              <i class="bi bi-arrow-left-right"></i> Transferencia recebida
+            </div>
+            <div class="row g-3">
+              {{ campo(form.escola_origem, coluna='col-12',
+                       ajuda='Preencher apenas se o aluno veio transferido de outra escola.') }}
+              {{ area_texto(form.observacoes, coluna='col-12', linhas=3) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1"
+                  {{ 'disabled' if sem_alunos or sem_turmas }}>
+            <i class="bi bi-check-lg"></i> Efetivar matricula
+          </button>
+          <a href="{{ url_for('matriculas.listar') }}" class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

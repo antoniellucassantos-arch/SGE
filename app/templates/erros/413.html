@@ -1,0 +1,10 @@
+{% extends 'erros/base_erro.html' %}
+{% block titulo %}Arquivo muito grande{% endblock %}
+{% block cor_icone %}sge-icone--alerta{% endblock %}
+{% block icone %}bi-file-earmark-x{% endblock %}
+{% block codigo %}413{% endblock %}
+{% block cabecalho %}Arquivo muito grande{% endblock %}
+{% block descricao %}
+  O arquivo enviado excede o limite de {{ limite_mb }} MB. Reduza o tamanho
+  da imagem ou do documento e tente novamente.
+{% endblock %}

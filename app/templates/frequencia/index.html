@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Diario de classe{% endblock %}
+{% block titulo_pagina %}Diario de classe{% endblock %}
+
+{% block subtitulo %}
+  <p>Selecione a disciplina para registrar aulas e lancar a chamada.</p>
+{% endblock %}
+
+{% block acoes %}
+  <a href="{{ url_for('frequencia.pendentes') }}" class="btn btn-light">
+    <i class="bi bi-exclamation-triangle"></i> Chamadas pendentes
+  </a>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if vinculos %}
+    <div class="row g-3">
+      {% for vinculo in vinculos %}
+        <div class="col-12 col-md-6 col-xl-4">
+          <a href="{{ url_for('frequencia.diario', vinculo_id=vinculo.id) }}"
+             class="card h-100 text-reset text-decoration-none">
+            <div class="card-body">
+              <div class="d-flex align-items-start gap-3">
+                <div class="sge-indicador__icone flex-shrink-0"
+                     style="background: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }}1a;
+                            color: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }};">
+                  <i class="bi bi-journal-text"></i>
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                  <h3 class="h6 mb-1 text-truncate">
+                    {{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}
+                  </h3>
+                  <div class="small sge-texto-suave">
+                    {{ vinculo.turma.nome_completo if vinculo.turma else '?' }}
+                  </div>
+                  {% if not current_user.e_professor %}
+                    <div class="small sge-texto-fraco mt-1">
+                      <i class="bi bi-person-video3 me-1"></i>{{ vinculo.nome_professor }}
+                    </div>
+                  {% endif %}
+                </div>
+                <i class="bi bi-chevron-right sge-texto-fraco"></i>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 mt-3">
+                <span class="badge sge-badge-suave">
+                  <i class="bi bi-clock me-1"></i>{{ vinculo.carga_horaria_semanal }} aula(s)/sem.
+                </span>
+                <span class="badge sge-badge-suave">
+                  <i class="bi bi-people me-1"></i>
+                  {{ vinculo.turma.contar_matriculas_ativas() if vinculo.turma else 0 }} alunos
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-journal-x"></i>
+      <h5>Nenhuma disciplina disponivel</h5>
+      <p class="mb-0">
+        {% if current_user.e_professor %}
+          Voce ainda nao possui disciplinas atribuidas neste ano letivo.
+          Procure a coordenacao.
+        {% else %}
+          Nenhuma disciplina foi atribuida as turmas deste ano letivo.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}

@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% from 'componentes/indicador.html' import indicador %}
+
+{% block titulo %}Backup{% endblock %}
+{% block titulo_pagina %}Backup do banco de dados{% endblock %}
+
+{% block subtitulo %}
+  <p>Copias de seguranca dos dados da escola.</p>
+{% endblock %}
+
+{% block acoes %}
+  <form method="post" action="{{ url_for('backup.gerar') }}"
+        data-confirmar
+        data-confirmar-titulo="Gerar backup"
+        data-confirmar-texto="Sera criada uma copia completa do banco de dados. A operacao pode levar alguns segundos."
+        data-confirmar-botao="Gerar backup"
+        data-confirmar-cor="primary">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-hdd-fill"></i> Gerar backup agora
+    </button>
+  </form>
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Alerta se nao ha backup recente --- #}
+  {% if not estatisticas.ultimo %}
+    <div class="alert alert-danger" role="alert">
+      <i class="bi bi-exclamation-octagon-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        <strong>Nenhum backup foi gerado ainda.</strong>
+        Gere o primeiro backup agora e configure a rotina automatica no
+        servidor. Sem backup, uma falha de disco significa perder todos os
+        dados da escola.
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Indicadores --- #}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      {{ indicador('Backups', estatisticas.total, 'bi-hdd-stack', 'primaria') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Bem-sucedidos', estatisticas.sucesso, 'bi-check-circle-fill', 'sucesso') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Falhas', estatisticas.falhas, 'bi-x-circle-fill',
+                   'perigo' if estatisticas.falhas else 'neutro') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {% set mb = (estatisticas.espaco_bytes / 1048576) | round(1) %}
+      {{ indicador('Espaco usado', mb ~ ' MB', 'bi-device-hdd', 'info') }}
+    </div>
+  </div>
+
+  {% if estatisticas.ultimo %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+      <div class="flex-grow-1">
+        Ultimo backup bem-sucedido:
+        <strong>{{ estatisticas.ultimo.criado_em | data_hora }}</strong>
+        ({{ estatisticas.ultimo.criado_em | tempo_relativo }})
+        &middot; {{ estatisticas.ultimo.tamanho_legivel }}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Historico --- #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-clock-history text-primary"></i> Historico de backups
+    </div>
+    <div class="card-body p-0">
+      {% if backups %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Arquivo</th>
+                <th class="d-none d-md-table-cell">Data</th>
+                <th class="text-center d-none d-md-table-cell">Origem</th>
+                <th class="text-center">Tamanho</th>
+                <th class="text-center">Situacao</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for registro in backups %}
+                <tr>
+                  <td>
+                    <span class="small sge-quebra">{{ registro.nome_arquivo }}</span>
+                    {% if registro.gerado_por %}
+                      <div class="small sge-texto-fraco">
+                        por {{ registro.gerado_por.nome_completo }}
+                      </div>
+                    {% endif %}
+                    <div class="small sge-texto-fraco d-md-none">
+                      {{ registro.criado_em | data_hora }}
+                    </div>
+                  </td>
+                  <td class="d-none d-md-table-cell small sge-numerico">
+                    {{ registro.criado_em | data_hora }}
+                    <div class="sge-texto-fraco">{{ registro.criado_em | tempo_relativo }}</div>
+                  </td>
+                  <td class="text-center d-none d-md-table-cell">
+                    <span class="badge sge-badge-suave">{{ registro.origem }}</span>
+                  </td>
+                  <td class="text-center small sge-numerico">{{ registro.tamanho_legivel }}</td>
+                  <td class="text-center">
+                    {% if registro.sucesso %}
+                      <span class="badge sge-badge-suave text-bg-success">
+                        <i class="bi bi-check-lg"></i> Sucesso
+                      </span>
+                    {% else %}
+                      <span class="badge sge-badge-suave text-bg-danger"
+                            data-bs-toggle="tooltip"
+                            title="{{ registro.mensagem_erro | truncar(120) }}">
+                        <i class="bi bi-x-lg"></i> Falha
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    {% if registro.sucesso %}
+                      <a href="{{ url_for('backup.baixar', backup_id=registro.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Baixar arquivo">
+                        <i class="bi bi-download"></i>
+                      </a>
+                      {% if tem_permissao(Permissao.BACKUP_RESTAURAR) %}
+                        <a href="{{ url_for('backup.restaurar', backup_id=registro.id) }}"
+                           class="btn btn-sm btn-light sge-btn-icone"
+                           data-bs-toggle="tooltip" title="Instrucoes de restauracao">
+                          <i class="bi bi-arrow-counterclockwise"></i>
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                    <form method="post" class="d-inline"
+                          action="{{ url_for('backup.excluir', backup_id=registro.id) }}"
+                          data-confirmar
+                          data-confirmar-titulo="Excluir backup"
+                          data-confirmar-texto="O arquivo sera removido definitivamente do servidor."
+                          data-confirmar-botao="Excluir">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                              data-bs-toggle="tooltip" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-hdd"></i>
+          <h5>Nenhum backup registrado</h5>
+          <p class="mb-0 small">Gere o primeiro backup usando o botao acima.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Orientacoes --- #}
+  <div class="card mt-3">
+    <div class="card-header">
+      <i class="bi bi-shield-check text-primary"></i> Boas praticas de backup
+    </div>
+    <div class="card-body">
+      <ul class="small sge-texto-suave mb-0 ps-3">
+        <li>
+          <strong>Guarde copias fora do servidor.</strong> Um backup no mesmo
+          disco do banco nao protege contra falha de hardware nem contra
+          ransomware. Baixe os arquivos periodicamente e mantenha-os em outro
+          local.
+        </li>
+        <li>
+          <strong>Agende a rotina automatica</strong> no servidor com o comando
+          <code>flask backup --automatico</code> (via Agendador de Tarefas no
+          Windows ou cron no Linux), preferencialmente fora do horario escolar.
+        </li>
+        <li>
+          <strong>Teste a restauracao</strong> pelo menos uma vez por trimestre.
+          Backup que nunca foi restaurado e uma suposicao, nao uma garantia.
+        </li>
+        <li>
+          <strong>Gere um backup manual antes</strong> de qualquer atualizacao do
+          sistema ou migracao de banco.
+        </li>
+        <li>
+          Retencao configurada: <strong>{{ config.BACKUP_RETENCAO_DIAS }} dias</strong>
+          ou <strong>{{ config.BACKUP_MAXIMO_ARQUIVOS }} arquivos</strong>.
+          O backup mais recente nunca e removido automaticamente.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+{% endblock %}

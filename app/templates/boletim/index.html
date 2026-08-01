@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Boletins{% endblock %}
+{% block titulo_pagina %}Boletins{% endblock %}
+
+{% block subtitulo %}
+  <p>Selecione a turma para consultar ou emitir os boletins.</p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if turmas %}
+    <div class="row g-3">
+      {% for turma in turmas %}
+        <div class="col-12 col-md-6 col-xl-4">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-start gap-3">
+                <div class="sge-indicador__icone sge-icone--primaria flex-shrink-0">
+                  <i class="bi bi-journal-text"></i>
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                  <h3 class="h6 mb-1 text-truncate">{{ turma.identificacao_curta }}</h3>
+                  <div class="small sge-texto-suave">
+                    {{ turma.serie.nome if turma.serie }} &middot; {{ turma.turno.rotulo }}
+                  </div>
+                  <div class="small sge-texto-fraco mt-1">
+                    <i class="bi bi-people me-1"></i>
+                    {{ turma.contar_matriculas_ativas() }} aluno(s)
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+              <a href="{{ url_for('boletim.da_turma', turma_id=turma.id) }}"
+                 class="btn btn-sm btn-primary flex-fill">
+                <i class="bi bi-table"></i> Ata de resultados
+              </a>
+              {% if tem_permissao(Permissao.BOLETIM_EMITIR) %}
+                <a href="{{ url_for('boletim.pdf_turma', turma_id=turma.id) }}"
+                   class="btn btn-sm btn-light" target="_blank" rel="noopener"
+                   data-bs-toggle="tooltip" title="Boletins da turma em PDF">
+                  <i class="bi bi-file-earmark-pdf"></i>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-journal-x"></i>
+      <h5>Nenhuma turma ativa</h5>
+      <p class="mb-0">
+        Cadastre turmas no ano letivo corrente para emitir boletins.
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}

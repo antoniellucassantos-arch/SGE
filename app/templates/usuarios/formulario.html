@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, caixa, resumo_erros %}
+
+{% block titulo %}{{ 'Editar conta' if usuario else 'Nova conta' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar conta' if usuario else 'Nova conta de acesso' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('usuarios.listar') }}">Usuarios</a></li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {{ usuario.nome_completo if usuario else 'Nova' }}
+      </li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <form method="post" novalidate data-avisar-saida>
+      {{ form.hidden_tag() }}
+      {{ resumo_erros(form) }}
+
+      {% if not usuario %}
+        <div class="alert alert-info" role="alert">
+          <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+          <div class="flex-grow-1">
+            Uma senha temporaria sera gerada e exibida <strong>uma unica vez</strong>
+            apos salvar. Anote-a para entregar ao usuario — a troca sera
+            obrigatoria no primeiro acesso.
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person text-primary"></i> Dados da conta</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.nome_completo, coluna='col-12') }}
+            {{ campo(form.email, coluna='col-12 col-md-7',
+                     ajuda='Sera usado como login do sistema.') }}
+            {{ campo(form.cpf, coluna='col-12 col-md-5', mascara='cpf') }}
+            {{ campo(form.telefone, coluna='col-12 col-md-5', mascara='telefone') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-shield-lock text-primary"></i> Acesso</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.papel, coluna='col-12 col-md-6',
+                       ajuda='Define as permissoes do usuario no sistema.') }}
+            {{ caixa(form.ativo, coluna='col-12',
+                     ajuda='Contas inativas nao conseguem entrar no sistema.') }}
+          </div>
+
+          <div class="alert alert-warning mt-3 mb-0" role="alert">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+              O perfil <strong>Administrador</strong> tem acesso irrestrito,
+              inclusive a configuracoes, backup e auditoria. Conceda apenas a
+              quem realmente precisa.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar conta
+          </button>
+          <a href="{{ url_for('usuarios.detalhe', usuario_id=usuario.id) if usuario else url_for('usuarios.listar') }}"
+             class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

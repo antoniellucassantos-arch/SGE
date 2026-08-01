@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, area_texto, caixa, resumo_erros %}
+
+{% block titulo %}{{ 'Editar turma' if turma else 'Nova turma' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar turma' if turma else 'Nova turma' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('turmas.listar') }}">Turmas</a></li>
+      {% if turma %}
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) }}">{{ turma.identificacao_curta }}</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">Editar</li>
+      {% else %}
+        <li class="breadcrumb-item active" aria-current="page">Nova</li>
+      {% endif %}
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-8">
+    <form method="post" novalidate data-avisar-saida>
+      {{ form.hidden_tag() }}
+      {{ resumo_erros(form) }}
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-diagram-3 text-primary"></i> Identificacao</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.ano_letivo_id, coluna='col-12 col-md-4') }}
+            {{ selecao(form.serie_id, coluna='col-12 col-md-5') }}
+            {{ campo(form.nome, coluna='col-12 col-md-3',
+                     ajuda='Letra ou nome curto que diferencia turmas da mesma serie.') }}
+            {{ selecao(form.turno, coluna='col-6 col-md-4') }}
+            {{ campo(form.capacidade, coluna='col-6 col-md-4') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person-badge text-primary"></i> Alocacao</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ selecao(form.sala_id, coluna='col-12 col-md-6',
+                       ajuda='Sala fixa da turma. Aulas em laboratorio podem ter sala propria na grade de horarios.') }}
+            {{ selecao(form.professor_regente_id, coluna='col-12 col-md-6',
+                       ajuda='Professor responsavel pelo acompanhamento da turma.') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-info-circle text-primary"></i> Situacao</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ caixa(form.ativa, coluna='col-12',
+                     ajuda='Turmas inativas nao aparecem para novas matriculas.') }}
+            {{ area_texto(form.observacoes, coluna='col-12', linhas=3) }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar turma
+          </button>
+          <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) if turma else url_for('turmas.listar') }}"
+             class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

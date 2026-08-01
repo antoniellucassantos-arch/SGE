@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, area_texto, caixa, resumo_erros %}
+
+{% block titulo %}{{ 'Editar disciplina' if disciplina else 'Nova disciplina' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar disciplina' if disciplina else 'Nova disciplina' }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('disciplinas.listar') }}">Disciplinas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {{ disciplina.nome if disciplina else 'Nova' }}
+      </li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8 col-xl-6">
+    <form method="post" novalidate data-avisar-saida>
+      {{ form.hidden_tag() }}
+      {{ resumo_erros(form) }}
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-book text-primary"></i> Dados da disciplina</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {{ campo(form.nome, coluna='col-12 col-md-8') }}
+            {{ campo(form.codigo, coluna='col-12 col-md-4',
+                     ajuda='Sigla curta usada em boletins e grades.') }}
+            {{ campo(form.carga_horaria, coluna='col-6 col-md-6') }}
+            <div class="col-6 col-md-6">
+              <label class="form-label" for="{{ form.cor.id }}">{{ form.cor.label.text }}</label>
+              {{ form.cor(class="form-control form-control-color w-100") }}
+              <div class="form-text">Identifica a disciplina na grade de horarios.</div>
+            </div>
+            {{ area_texto(form.descricao, coluna='col-12', linhas=4) }}
+            {{ caixa(form.ativa, coluna='col-12',
+                     ajuda='Disciplinas inativas nao podem ser atribuidas a novas turmas.') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body sge-acoes-form">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-check-lg"></i> Salvar disciplina
+          </button>
+          <a href="{{ url_for('disciplinas.listar') }}" class="btn btn-light">Cancelar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

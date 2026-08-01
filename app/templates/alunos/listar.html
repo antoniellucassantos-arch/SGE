@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao, coluna_ordenavel, linha_sem_resultado %}
+
+{% block titulo %}Alunos{% endblock %}
+{% block titulo_pagina %}Alunos{% endblock %}
+
+{% block subtitulo %}
+  <p>Cadastro, consulta e ficha completa dos estudantes.</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.ALUNO_CRIAR) %}
+    <a href="{{ url_for('alunos.novo') }}" class="btn btn-primary">
+      <i class="bi bi-person-plus"></i> Novo aluno
+    </a>
+  {% endif %}
+  {% if tem_permissao(Permissao.RELATORIO_EXPORTAR) %}
+    <a href="{{ url_for('relatorios.exportar_alunos', **request.args) }}"
+       class="btn btn-light">
+      <i class="bi bi-file-earmark-excel"></i> Exportar
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# ------------------------------------------------------------------ #}
+  {# Filtros                                                            #}
+  {# ------------------------------------------------------------------ #}
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label for="{{ form.busca.id }}" class="form-label">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            {{ form.busca(class="form-control") }}
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <label for="{{ form.situacao.id }}" class="form-label">Situacao</label>
+          {{ form.situacao(class="form-select") }}
+        </div>
+
+        <div class="col-6 col-md-3">
+          <label for="{{ form.turma_id.id }}" class="form-label">Turma</label>
+          {{ form.turma_id(class="form-select") }}
+        </div>
+
+        <div class="col-12 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('alunos.listar') }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+
+        <div class="col-12">
+          <div class="form-check">
+            {{ form.sem_turma(class="form-check-input") }}
+            <label class="form-check-label small" for="{{ form.sem_turma.id }}">
+              {{ form.sem_turma.label.text }}
+            </label>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Listagem                                                           #}
+  {# ------------------------------------------------------------------ #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-people text-primary"></i>
+      Alunos cadastrados
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0" id="tabelaAlunos">
+            <thead>
+              <tr>
+                {{ coluna_ordenavel('Aluno', 'nome', 'alunos.listar', ordenacao, parametros) }}
+                {{ coluna_ordenavel('Codigo', 'codigo', 'alunos.listar', ordenacao, parametros, 'd-none d-md-table-cell') }}
+                <th class="d-none d-lg-table-cell">Turma atual</th>
+                {{ coluna_ordenavel('Nascimento', 'nascimento', 'alunos.listar', ordenacao, parametros, 'd-none d-xl-table-cell') }}
+                <th class="d-none d-lg-table-cell">Responsavel</th>
+                {{ coluna_ordenavel('Situacao', 'situacao', 'alunos.listar', ordenacao, parametros) }}
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for aluno in pagina.items %}
+                <tr>
+                  {# --- Identificacao --- #}
+                  <td>
+                    <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}"
+                       class="d-flex align-items-center gap-2 text-reset text-decoration-none">
+                      {% if aluno.foto %}
+                        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                             alt="" class="sge-avatar sge-avatar--sm">
+                      {% else %}
+                        <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+                      {% endif %}
+                      <span class="min-w-0">
+                        <span class="d-block fw-semibold text-truncate">
+                          {{ aluno.nome_exibicao }}
+                          {% if aluno.tem_alerta_saude %}
+                            <i class="bi bi-heart-pulse-fill text-danger small ms-1"
+                               data-bs-toggle="tooltip"
+                               title="Possui informacoes de saude relevantes"></i>
+                          {% endif %}
+                        </span>
+                        <span class="d-block small sge-texto-fraco d-md-none">
+                          {{ aluno.codigo }}
+                        </span>
+                      </span>
+                    </a>
+                  </td>
+
+                  <td class="d-none d-md-table-cell sge-numerico small">{{ aluno.codigo }}</td>
+
+                  <td class="d-none d-lg-table-cell">
+                    {% set turma = aluno.turma_atual %}
+                    {% if turma %}
+                      <span class="badge sge-badge-suave">{{ turma.identificacao_curta }}</span>
+                    {% else %}
+                      <span class="sge-texto-fraco small">Sem matricula</span>
+                    {% endif %}
+                  </td>
+
+                  <td class="d-none d-xl-table-cell small sge-numerico">
+                    {{ aluno.data_nascimento | data }}
+                    {% if aluno.idade is not none %}
+                      <span class="sge-texto-fraco">({{ aluno.idade }}a)</span>
+                    {% endif %}
+                  </td>
+
+                  <td class="d-none d-lg-table-cell small">
+                    {% set responsavel = aluno.responsavel_principal %}
+                    {% if responsavel %}
+                      <span class="d-block text-truncate" style="max-width: 180px;">
+                        {{ responsavel.nome_completo }}
+                      </span>
+                      <span class="sge-texto-fraco">{{ responsavel.telefone_formatado }}</span>
+                    {% else %}
+                      <span class="sge-texto-fraco">Nao informado</span>
+                    {% endif %}
+                  </td>
+
+                  <td>
+                    <span class="badge sge-badge-suave text-bg-{{ aluno.situacao.cor }}">
+                      {{ aluno.situacao.rotulo }}
+                    </span>
+                  </td>
+
+                  {# --- Acoes --- #}
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Ver ficha">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+                      <a href="{{ url_for('alunos.editar', aluno_id=aluno.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                    {% if tem_permissao(Permissao.MATRICULA_CRIAR) and not aluno.esta_matriculado %}
+                      <a href="{{ url_for('matriculas.nova', aluno_id=aluno.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Matricular">
+                        <i class="bi bi-file-earmark-plus"></i>
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(7) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-people"></i>
+          <h5>Nenhum aluno encontrado</h5>
+          <p class="mb-3">
+            {% if request.args %}
+              Nenhum registro corresponde aos filtros aplicados.
+            {% else %}
+              Comece cadastrando o primeiro aluno da escola.
+            {% endif %}
+          </p>
+          {% if request.args %}
+            <a href="{{ url_for('alunos.listar') }}" class="btn btn-light">
+              <i class="bi bi-x-lg"></i> Limpar filtros
+            </a>
+          {% elif tem_permissao(Permissao.ALUNO_CRIAR) %}
+            <a href="{{ url_for('alunos.novo') }}" class="btn btn-primary">
+              <i class="bi bi-person-plus"></i> Cadastrar aluno
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'alunos.listar', parametros, 'alunos') }}
+
+{% endblock %}

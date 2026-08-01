@@ -1,0 +1,205 @@
+{# ===========================================================================
+   Ficha base de cadastro de pessoas.
+
+   Cada modulo estende este template e preenche ``conteudo_especifico`` com
+   o que e proprio do seu dominio (turmas do professor, alunos do
+   responsavel, dados funcionais do funcionario).
+   =========================================================================== #}
+{% extends 'base.html' %}
+
+{% block titulo %}{{ registro.nome_exibicao }}{% endblock %}
+{% block titulo_pagina %}Ficha do {{ ctx.titulo | lower }}{% endblock %}
+
+{% block navegacao %}
+  <nav aria-label="Trilha de navegacao">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ url_for(ctx.endpoints.listar) }}">{{ ctx.titulo_plural }}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ registro.nome_exibicao }}</li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(ctx.permissoes.editar) %}
+    <a href="{{ url_for(ctx.endpoints.editar, **{ctx.parametro_id: registro.id}) }}"
+       class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Editar
+    </a>
+  {% endif %}
+  {% block acoes_extras %}{% endblock %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Identificacao --- #}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      {% if registro.foto %}
+        <img src="{{ url_for('static', filename='uploads/' ~ ctx.pasta_fotos ~ '/' ~ registro.foto) }}"
+             alt="Foto de {{ registro.nome_exibicao }}" class="sge-avatar sge-avatar--lg">
+      {% else %}
+        <span class="sge-avatar sge-avatar--lg">{{ registro.iniciais }}</span>
+      {% endif %}
+
+      <div class="min-w-0 flex-grow-1">
+        <h2 class="h5 mb-1 sge-quebra">{{ registro.nome_exibicao }}</h2>
+        {% if registro.nome_social %}
+          <div class="small sge-texto-fraco">Nome civil: {{ registro.nome_completo }}</div>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          {% if ctx.campo_identificador and registro[ctx.campo_identificador] %}
+            <span class="badge sge-badge-suave">
+              <i class="bi bi-upc me-1"></i>{{ registro[ctx.campo_identificador] }}
+            </span>
+          {% endif %}
+          <span class="badge sge-badge-suave text-bg-{{ registro.situacao.cor }}">
+            {{ registro.situacao.rotulo }}
+          </span>
+          {% if registro.idade is not none %}
+            <span class="badge sge-badge-suave">{{ registro.idade }} anos</span>
+          {% endif %}
+          {% block emblemas_extras %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Conta de acesso --- #}
+  {% if tem_permissao(Permissao.USUARIO_CRIAR) %}
+    <div class="card mb-3">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="min-w-0">
+          <h6 class="mb-1"><i class="bi bi-shield-lock me-1 text-primary"></i> Conta de acesso</h6>
+          {% if registro.usuario %}
+            <p class="small sge-texto-suave mb-0">
+              Acesso ativo com o e-mail <strong>{{ registro.usuario.email }}</strong>
+              &middot; perfil {{ registro.usuario.papel.rotulo }}
+              {% if registro.usuario.ultimo_login_em %}
+                &middot; ultimo acesso {{ registro.usuario.ultimo_login_em | tempo_relativo }}
+              {% else %}
+                &middot; <span class="text-warning">nunca acessou</span>
+              {% endif %}
+            </p>
+          {% else %}
+            <p class="small sge-texto-suave mb-0">
+              Este cadastro ainda nao possui login no sistema.
+              {% if not registro.email %}
+                Informe um e-mail no cadastro para habilitar a criacao da conta.
+              {% endif %}
+            </p>
+          {% endif %}
+        </div>
+
+        {% if registro.usuario %}
+          <a href="{{ url_for('usuarios.detalhe', usuario_id=registro.usuario.id) }}"
+             class="btn btn-light">
+            <i class="bi bi-box-arrow-up-right"></i> Gerenciar conta
+          </a>
+        {% elif registro.email %}
+          <form method="post"
+                action="{{ url_for(ctx.endpoints.criar_acesso, **{ctx.parametro_id: registro.id}) }}"
+                data-confirmar
+                data-confirmar-titulo="Criar conta de acesso"
+                data-confirmar-texto="Sera gerada uma senha temporaria exibida uma unica vez. A troca sera obrigatoria no primeiro acesso."
+                data-confirmar-botao="Criar conta"
+                data-confirmar-cor="primary">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-person-plus"></i> Criar acesso
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Conteudo especifico do modulo --- #}
+  {% block conteudo_especifico %}{% endblock %}
+
+  {# --- Dados cadastrais --- #}
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-card-text text-primary"></i> Documentos</div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 sge-texto-suave">CPF</dt>
+            <dd class="col-7 sge-numerico">{{ registro.cpf | cpf }}</dd>
+            <dt class="col-5 sge-texto-suave">RG</dt>
+            <dd class="col-7">
+              {{ registro.rg or '—' }}
+              {% if registro.rg_orgao_emissor %}
+                <span class="sge-texto-fraco">({{ registro.rg_orgao_emissor }})</span>
+              {% endif %}
+            </dd>
+            <dt class="col-5 sge-texto-suave">Nascimento</dt>
+            <dd class="col-7 sge-numerico">{{ registro.data_nascimento | data }}</dd>
+            <dt class="col-5 sge-texto-suave">Sexo</dt>
+            <dd class="col-7">{{ registro.sexo.rotulo }}</dd>
+            {% if registro.estado_civil is defined %}
+              <dt class="col-5 sge-texto-suave">Estado civil</dt>
+              <dd class="col-7">{{ registro.estado_civil.rotulo }}</dd>
+            {% endif %}
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-geo-alt text-primary"></i> Contato e endereco</div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 sge-texto-suave">Celular</dt>
+            <dd class="col-7 sge-numerico">{{ registro.celular | telefone }}</dd>
+            <dt class="col-5 sge-texto-suave">Telefone</dt>
+            <dd class="col-7 sge-numerico">{{ registro.telefone | telefone }}</dd>
+            <dt class="col-5 sge-texto-suave">E-mail</dt>
+            <dd class="col-7 sge-quebra">{{ registro.email or '—' }}</dd>
+            <dt class="col-5 sge-texto-suave">Endereco</dt>
+            <dd class="col-7 sge-quebra">{{ registro.endereco_completo or '—' }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    {% if registro.observacoes %}
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-sticky text-primary"></i> Observacoes</div>
+          <div class="card-body small">{{ registro.observacoes | quebra_linha }}</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {# --- Zona de risco --- #}
+  {% if tem_permissao(ctx.permissoes.excluir) %}
+    <div class="card mt-4 border-danger-subtle">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="min-w-0">
+          <h6 class="mb-1 text-danger">
+            <i class="bi bi-exclamation-triangle me-1"></i> Excluir cadastro
+          </h6>
+          <p class="small sge-texto-suave mb-0">
+            A exclusao e logica e desativa tambem a conta de acesso, se houver.
+          </p>
+        </div>
+        <form method="post"
+              action="{{ url_for(ctx.endpoints.excluir, **{ctx.parametro_id: registro.id}) }}"
+              data-confirmar
+              data-confirmar-titulo="Excluir {{ ctx.titulo | lower }}"
+              data-confirmar-texto="O cadastro de {{ registro.nome_exibicao }} sera marcado como excluido e o acesso ao sistema sera revogado."
+              data-confirmar-botao="Excluir cadastro">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> Excluir
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

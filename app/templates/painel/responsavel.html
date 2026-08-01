@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Painel{% endblock %}
+{% block titulo_pagina %}Acompanhamento escolar{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    Ola, {{ current_user.primeiro_nome }}. Acompanhe o desempenho de
+    {{ 'seus filhos' if filhos | length > 1 else 'seu filho(a)' }}.
+  </p>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if not filhos %}
+    <div class="sge-vazio">
+      <i class="bi bi-people"></i>
+      <h5>Nenhum aluno vinculado</h5>
+      <p class="mb-0">
+        Nao encontramos alunos vinculados ao seu cadastro.
+        Procure a secretaria da escola para regularizar o vinculo.
+      </p>
+    </div>
+  {% else %}
+
+    <div class="row g-3">
+      {% for filho in filhos %}
+        {% set aluno = filho.aluno %}
+        <div class="col-12 col-xl-6">
+          <div class="card h-100">
+
+            <div class="card-header">
+              <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+                {% if aluno.foto %}
+                  <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                       alt="" class="sge-avatar sge-avatar--sm">
+                {% else %}
+                  <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+                {% endif %}
+                <div class="min-w-0">
+                  <div class="text-truncate">{{ aluno.nome_exibicao }}</div>
+                  <div class="small fw-normal sge-texto-fraco">
+                    {{ filho.turma.nome_completo if filho.turma else 'Sem turma ativa' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              {% if not filho.matricula %}
+                <div class="sge-vazio py-4">
+                  <i class="bi bi-file-earmark-x"></i>
+                  <p class="mb-0 small">Sem matricula ativa no ano letivo corrente.</p>
+                </div>
+              {% else %}
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <div class="p-3 rounded" style="background: var(--sge-superficie-alt);">
+                      <div class="sge-indicador__rotulo">Media geral</div>
+                      <div class="h4 mb-0 sge-numerico text-{{ 'success' if (filho.media_geral or 0) >= 6 else 'danger' }}">
+                        {{ filho.media_geral | nota if filho.media_geral is not none else '—' }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 rounded" style="background: var(--sge-superficie-alt);">
+                      <div class="sge-indicador__rotulo">Frequencia</div>
+                      <div class="h4 mb-0 sge-numerico text-{{ 'success' if (filho.percentual_frequencia or 100) >= 75 else 'danger' }}">
+                        {{ filho.percentual_frequencia | percentual if filho.percentual_frequencia is not none else '—' }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-between small sge-texto-suave mb-3">
+                  <span><i class="bi bi-journal me-1"></i>{{ filho.total_aulas }} aulas</span>
+                  <span class="text-{{ 'danger' if filho.total_faltas > 10 else '' }}">
+                    <i class="bi bi-x-circle me-1"></i>{{ filho.total_faltas }} faltas
+                  </span>
+                </div>
+
+                {% if filho.percentual_frequencia is not none and filho.percentual_frequencia < 75 %}
+                  <div class="alert alert-warning py-2 mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                    <div class="flex-grow-1 small">
+                      A frequencia esta abaixo do minimo legal de 75%.
+                      Procure a coordenacao.
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if filho.ultimas_notas %}
+                  <h6 class="small text-uppercase sge-texto-fraco mb-2">Ultimas notas</h6>
+                  <div class="d-flex flex-column gap-1">
+                    {% for nota in filho.ultimas_notas[:4] %}
+                      {% set avaliacao = nota.avaliacao %}
+                      <div class="d-flex justify-content-between align-items-center small">
+                        <span class="text-truncate me-2">
+                          {{ avaliacao.turma_disciplina.disciplina.nome
+                             if avaliacao and avaliacao.turma_disciplina and avaliacao.turma_disciplina.disciplina
+                             else '?' }}
+                          <span class="sge-texto-fraco">&middot; {{ avaliacao.nome if avaliacao else '' }}</span>
+                        </span>
+                        <span class="badge sge-badge-suave text-bg-{{ 'danger' if nota.ausente or (nota.valor or 0) < 6 else 'success' }} sge-numerico">
+                          {{ nota.valor_exibicao }}
+                        </span>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endif %}
+            </div>
+
+            <div class="card-footer d-flex gap-2">
+              <a href="{{ url_for('boletim.do_aluno', aluno_id=aluno.id) }}"
+                 class="btn btn-sm btn-primary flex-fill">
+                <i class="bi bi-journal-text"></i> Boletim
+              </a>
+              <a href="{{ url_for('frequencia.do_aluno', aluno_id=aluno.id) }}"
+                 class="btn btn-sm btn-light flex-fill">
+                <i class="bi bi-calendar-check"></i> Frequencia
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% endif %}
+{% endblock %}

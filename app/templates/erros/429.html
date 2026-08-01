@@ -1,0 +1,15 @@
+{% extends 'erros/base_erro.html' %}
+{% block titulo %}Muitas tentativas{% endblock %}
+{% block cor_icone %}sge-icone--alerta{% endblock %}
+{% block icone %}bi-hourglass-split{% endblock %}
+{% block codigo %}429{% endblock %}
+{% block cabecalho %}Muitas tentativas{% endblock %}
+{% block descricao %}
+  Detectamos um numero elevado de solicitacoes em pouco tempo. Aguarde
+  alguns instantes antes de tentar novamente.
+{% endblock %}
+{% block acoes %}
+  <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+    <i class="bi bi-box-arrow-in-right"></i> Ir para o login
+  </a>
+{% endblock %}

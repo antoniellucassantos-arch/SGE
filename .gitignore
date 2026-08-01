@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# SGE - Sistema de Gestao Escolar
+# Arquivos e diretorios ignorados pelo controle de versao
+# ---------------------------------------------------------------------------
+
+# Ambiente virtual
+venv/
+.venv/
+env/
+ENV/
+
+# Bytecode Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribuicao / empacotamento
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Variaveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Banco de dados local (SQLite) e pasta instance
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads enviados por usuarios (ficam sob app/static/ para o Nginx servir)
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+!app/static/uploads/**/.gitkeep
+
+# Backups gerados pelo sistema
+database/backups/*
+!database/backups/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Ferramentas de qualidade
+.ruff_cache/
+.mypy_cache/
+
+# IDEs / editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini

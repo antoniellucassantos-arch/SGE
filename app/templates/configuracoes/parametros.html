@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% from 'componentes/campo.html' import campo, selecao, caixa, resumo_erros %}
+
+{% block titulo %}Parametros academicos{% endblock %}
+{% block titulo_pagina %}Configuracoes{% endblock %}
+
+{% block subtitulo %}
+  <p>Regras padrao de aprovacao, frequencia e operacao do sistema.</p>
+{% endblock %}
+
+{% block conteudo %}
+  {% include 'configuracoes/_navegacao.html' %}
+
+  <div class="row g-3 justify-content-center">
+    <div class="col-12 col-xl-8">
+
+      <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+        <div class="flex-grow-1">
+          Estes valores servem de <strong>padrao para novos anos letivos</strong>.
+          Cada ano guarda a propria copia das regras, de modo que alterar aqui
+          nunca reescreve resultados ja apurados em anos anteriores.
+        </div>
+      </div>
+
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        {{ resumo_erros(form) }}
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-mortarboard text-primary"></i> Avaliacao
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              {{ campo(form.media_aprovacao, coluna='col-6 col-md-3',
+                       ajuda='Media minima para aprovacao.') }}
+              {{ campo(form.media_recuperacao, coluna='col-6 col-md-3',
+                       ajuda='Abaixo disso, reprovacao direta.') }}
+              {{ campo(form.nota_maxima, coluna='col-6 col-md-3',
+                       ajuda='Escala das avaliacoes.') }}
+              {{ selecao(form.quantidade_periodos, coluna='col-6 col-md-3') }}
+              {{ campo(form.frequencia_minima, coluna='col-6 col-md-3',
+                       ajuda='A LDB exige 75%.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <i class="bi bi-hdd text-primary"></i> Backup automatico
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              {{ caixa(form.backup_automatico, coluna='col-12 col-md-6') }}
+              {{ campo(form.backup_hora, coluna='col-6 col-md-3',
+                       ajuda='Preferencialmente fora do horario escolar.') }}
+            </div>
+            <div class="alert alert-warning mt-3 mb-0" role="alert">
+              <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+              <div class="flex-grow-1 small">
+                Esta configuracao apenas registra a intencao. O agendamento
+                real deve ser criado no servidor (Agendador de Tarefas do
+                Windows ou cron do Linux) chamando
+                <code>flask backup --automatico</code>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if not somente_leitura %}
+          <div class="card">
+            <div class="card-body sge-acoes-form">
+              <button type="submit" class="btn btn-primary flex-grow-1">
+                <i class="bi bi-check-lg"></i> Salvar parametros
+              </button>
+            </div>
+          </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% endblock %}

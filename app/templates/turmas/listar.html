@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao, coluna_ordenavel, linha_sem_resultado %}
+
+{% block titulo %}Turmas{% endblock %}
+{% block titulo_pagina %}Turmas{% endblock %}
+
+{% block subtitulo %}
+  <p>Organizacao das turmas por ano letivo, serie e turno.</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.TURMA_CRIAR) %}
+    <a href="{{ url_for('turmas.nova') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Nova turma
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label for="{{ form.busca.id }}" class="form-label">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            {{ form.busca(class="form-control", placeholder="Nome da turma ou serie") }}
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <label for="{{ form.ano_letivo_id.id }}" class="form-label">Ano letivo</label>
+          {{ form.ano_letivo_id(class="form-select") }}
+        </div>
+        <div class="col-6 col-md-2">
+          <label for="{{ form.serie_id.id }}" class="form-label">Serie</label>
+          {{ form.serie_id(class="form-select") }}
+        </div>
+        <div class="col-6 col-md-2">
+          <label for="{{ form.turno.id }}" class="form-label">Turno</label>
+          {{ form.turno(class="form-select") }}
+        </div>
+        <div class="col-6 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('turmas.listar') }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-diagram-3 text-primary"></i> Turmas
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                {{ coluna_ordenavel('Turma', 'nome', 'turmas.listar', ordenacao, parametros) }}
+                <th class="d-none d-md-table-cell">Serie</th>
+                {{ coluna_ordenavel('Turno', 'turno', 'turmas.listar', ordenacao, parametros, 'd-none d-md-table-cell') }}
+                <th class="d-none d-lg-table-cell">Sala</th>
+                <th class="d-none d-lg-table-cell">Regente</th>
+                <th style="min-width:150px;">Ocupacao</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for turma in pagina.items %}
+                {% set ocupados = turma.contar_matriculas_ativas() %}
+                {% set taxa = turma.taxa_ocupacao %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) }}"
+                       class="fw-semibold text-reset text-decoration-none">
+                      {{ turma.identificacao_curta }}
+                    </a>
+                    {% if not turma.ativa %}
+                      <span class="badge sge-badge-suave text-bg-secondary ms-1">Inativa</span>
+                    {% endif %}
+                    <div class="small sge-texto-fraco d-md-none">
+                      {{ turma.serie.nome if turma.serie }} &middot; {{ turma.turno.rotulo }}
+                    </div>
+                  </td>
+                  <td class="d-none d-md-table-cell small">{{ turma.serie.nome if turma.serie else '—' }}</td>
+                  <td class="d-none d-md-table-cell">
+                    <span class="badge sge-badge-suave text-bg-{{ turma.turno.cor }}">
+                      {{ turma.turno.rotulo }}
+                    </span>
+                  </td>
+                  <td class="d-none d-lg-table-cell small">{{ turma.sala.nome if turma.sala else '—' }}</td>
+                  <td class="d-none d-lg-table-cell small text-truncate" style="max-width:160px;">
+                    {{ turma.professor_regente.nome_exibicao if turma.professor_regente else '—' }}
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="progress flex-grow-1" style="min-width:60px;"
+                           role="progressbar" aria-label="Ocupacao da turma"
+                           aria-valuenow="{{ taxa }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar bg-{{ 'danger' if taxa >= 100 else ('warning' if taxa >= 85 else 'success') }}"
+                             style="width: {{ [taxa, 100] | min }}%"></div>
+                      </div>
+                      <span class="small sge-numerico text-nowrap">
+                        {{ ocupados }}/{{ turma.capacidade }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Ver turma">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    {% if tem_permissao(Permissao.TURMA_EDITAR) %}
+                      <a href="{{ url_for('turmas.editar', turma_id=turma.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(7) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-diagram-3"></i>
+          <h5>Nenhuma turma encontrada</h5>
+          <p class="mb-3">
+            {% if request.args %}
+              Nenhuma turma corresponde aos filtros aplicados.
+            {% else %}
+              Crie a primeira turma do ano letivo.
+            {% endif %}
+          </p>
+          {% if tem_permissao(Permissao.TURMA_CRIAR) %}
+            <a href="{{ url_for('turmas.nova') }}" class="btn btn-primary">
+              <i class="bi bi-plus-lg"></i> Nova turma
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'turmas.listar', parametros, 'turmas') }}
+
+{% endblock %}

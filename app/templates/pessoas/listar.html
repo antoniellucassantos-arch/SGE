@@ -1,0 +1,182 @@
+{# ===========================================================================
+   Listagem generica de cadastros de pessoas.
+
+   Compartilhada por professores, funcionarios e responsaveis: os tres tem a
+   mesma estrutura de tabela (identificacao, documento, contato, situacao,
+   acoes). O que muda vem do dicionario ``ctx``, montado em cada blueprint.
+
+   Manter um unico template evita que uma melhoria de usabilidade seja
+   aplicada em duas telas e esquecida na terceira.
+   =========================================================================== #}
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao, coluna_ordenavel, linha_sem_resultado %}
+
+{% block titulo %}{{ ctx.titulo_plural }}{% endblock %}
+{% block titulo_pagina %}{{ ctx.titulo_plural }}{% endblock %}
+
+{% block subtitulo %}
+  <p>{{ ctx.descricao }}</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(ctx.permissoes.criar) %}
+    <a href="{{ url_for(ctx.endpoints.novo) }}" class="btn btn-primary">
+      <i class="bi bi-person-plus"></i> Novo {{ ctx.titulo | lower }}
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Filtros --- #}
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-5">
+          <label for="{{ form.busca.id }}" class="form-label">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            {{ form.busca(class="form-control") }}
+          </div>
+        </div>
+
+        {% for campo in form if campo.name not in ['busca', 'csrf_token'] %}
+          <div class="col-6 col-md-3">
+            <label for="{{ campo.id }}" class="form-label">{{ campo.label.text }}</label>
+            {{ campo(class="form-select") }}
+          </div>
+        {% endfor %}
+
+        <div class="col-12 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for(ctx.endpoints.listar) }}" class="btn btn-light"
+               data-bs-toggle="tooltip" title="Limpar filtros">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# --- Tabela --- #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi {{ ctx.icone }} text-primary"></i>
+      {{ ctx.titulo_plural }} cadastrados
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                {{ coluna_ordenavel('Nome', 'nome', ctx.endpoints.listar, ordenacao, parametros) }}
+                {% if ctx.campo_identificador %}
+                  {{ coluna_ordenavel(ctx.rotulo_identificador, 'registro', ctx.endpoints.listar, ordenacao, parametros, 'd-none d-md-table-cell') }}
+                {% endif %}
+                <th class="d-none d-lg-table-cell">CPF</th>
+                <th class="d-none d-md-table-cell">Contato</th>
+                {{ coluna_ordenavel('Situacao', 'situacao', ctx.endpoints.listar, ordenacao, parametros) }}
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for registro in pagina.items %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for(ctx.endpoints.detalhe, **{ctx.parametro_id: registro.id}) }}"
+                       class="d-flex align-items-center gap-2 text-reset text-decoration-none">
+                      {% if registro.foto %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ ctx.pasta_fotos ~ '/' ~ registro.foto) }}"
+                             alt="" class="sge-avatar sge-avatar--sm">
+                      {% else %}
+                        <span class="sge-avatar sge-avatar--sm">{{ registro.iniciais }}</span>
+                      {% endif %}
+                      <span class="min-w-0">
+                        <span class="d-block fw-semibold text-truncate">{{ registro.nome_exibicao }}</span>
+                        {% if registro.usuario_id %}
+                          <span class="d-block small sge-texto-fraco">
+                            <i class="bi bi-shield-check me-1"></i>Possui acesso
+                          </span>
+                        {% endif %}
+                      </span>
+                    </a>
+                  </td>
+
+                  {% if ctx.campo_identificador %}
+                    <td class="d-none d-md-table-cell sge-numerico small">
+                      {{ registro[ctx.campo_identificador] or '—' }}
+                    </td>
+                  {% endif %}
+
+                  <td class="d-none d-lg-table-cell sge-numerico small">{{ registro.cpf | cpf }}</td>
+
+                  <td class="d-none d-md-table-cell small">
+                    <span class="d-block sge-numerico">{{ registro.telefone_formatado }}</span>
+                    {% if registro.email %}
+                      <span class="d-block sge-texto-fraco text-truncate" style="max-width:200px;">
+                        {{ registro.email }}
+                      </span>
+                    {% endif %}
+                  </td>
+
+                  <td>
+                    <span class="badge sge-badge-suave text-bg-{{ registro.situacao.cor }}">
+                      {{ registro.situacao.rotulo }}
+                    </span>
+                  </td>
+
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for(ctx.endpoints.detalhe, **{ctx.parametro_id: registro.id}) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Ver ficha">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    {% if tem_permissao(ctx.permissoes.editar) %}
+                      <a href="{{ url_for(ctx.endpoints.editar, **{ctx.parametro_id: registro.id}) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(7) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi {{ ctx.icone }}"></i>
+          <h5>Nenhum registro encontrado</h5>
+          <p class="mb-3">
+            {% if request.args %}
+              Nenhum {{ ctx.titulo | lower }} corresponde aos filtros aplicados.
+            {% else %}
+              Comece cadastrando o primeiro {{ ctx.titulo | lower }}.
+            {% endif %}
+          </p>
+          {% if request.args %}
+            <a href="{{ url_for(ctx.endpoints.listar) }}" class="btn btn-light">
+              <i class="bi bi-x-lg"></i> Limpar filtros
+            </a>
+          {% elif tem_permissao(ctx.permissoes.criar) %}
+            <a href="{{ url_for(ctx.endpoints.novo) }}" class="btn btn-primary">
+              <i class="bi bi-person-plus"></i> Cadastrar {{ ctx.titulo | lower }}
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, ctx.endpoints.listar, parametros, ctx.titulo_plural | lower) }}
+
+{% endblock %}

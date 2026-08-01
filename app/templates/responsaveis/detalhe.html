@@ -1,0 +1,114 @@
+{% extends 'pessoas/detalhe_base.html' %}
+{% set registro = responsavel %}
+
+{% block emblemas_extras %}
+  <span class="badge sge-badge-suave text-bg-primary">
+    <i class="bi bi-people me-1"></i>
+    {{ responsavel.vinculos_alunos | length }} aluno(s) vinculado(s)
+  </span>
+{% endblock %}
+
+{% block conteudo_especifico %}
+
+  {# --- Alunos vinculados --- #}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-people text-primary"></i> Alunos sob responsabilidade
+    </div>
+    <div class="card-body p-0">
+      {% if responsavel.vinculos_alunos %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Aluno</th>
+                <th>Parentesco</th>
+                <th class="d-none d-md-table-cell">Turma atual</th>
+                <th class="text-center">Atribuicoes</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for vinculo in responsavel.vinculos_alunos %}
+                {% set aluno = vinculo.aluno %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      {% if aluno.foto %}
+                        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+                             alt="" class="sge-avatar sge-avatar--sm">
+                      {% else %}
+                        <span class="sge-avatar sge-avatar--sm">{{ aluno.iniciais }}</span>
+                      {% endif %}
+                      <div class="min-w-0">
+                        <div class="fw-semibold text-truncate">{{ aluno.nome_exibicao }}</div>
+                        <div class="small sge-texto-fraco sge-numerico">{{ aluno.codigo }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge sge-badge-suave text-bg-{{ vinculo.parentesco.cor }}">
+                      {{ vinculo.parentesco.rotulo }}
+                    </span>
+                  </td>
+                  <td class="d-none d-md-table-cell">
+                    {% set turma = aluno.turma_atual %}
+                    {% if turma %}
+                      <span class="badge sge-badge-suave">{{ turma.identificacao_curta }}</span>
+                    {% else %}
+                      <span class="sge-texto-fraco small">Sem matricula</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if vinculo.responsavel_legal %}
+                      <i class="bi bi-shield-check text-primary" data-bs-toggle="tooltip" title="Responsavel legal"></i>
+                    {% endif %}
+                    {% if vinculo.responsavel_financeiro %}
+                      <i class="bi bi-cash-coin text-success ms-1" data-bs-toggle="tooltip" title="Responsavel financeiro"></i>
+                    {% endif %}
+                    {% if vinculo.autorizado_buscar %}
+                      <i class="bi bi-door-open text-info ms-1" data-bs-toggle="tooltip" title="Autorizado a buscar"></i>
+                    {% endif %}
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('alunos.detalhe', aluno_id=aluno.id) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Ver ficha do aluno">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-people"></i>
+          <h5>Nenhum aluno vinculado</h5>
+          <p class="mb-0 small">
+            O vinculo e criado na aba <strong>Responsaveis</strong> da ficha de cada aluno.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Dados profissionais --- #}
+  {% if responsavel.profissao or responsavel.local_trabalho %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-briefcase text-primary"></i> Dados profissionais</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 col-md-3 sge-texto-suave">Profissao</dt>
+          <dd class="col-7 col-md-9">{{ responsavel.profissao or '—' }}</dd>
+          <dt class="col-5 col-md-3 sge-texto-suave">Local de trabalho</dt>
+          <dd class="col-7 col-md-9">{{ responsavel.local_trabalho or '—' }}</dd>
+          <dt class="col-5 col-md-3 sge-texto-suave">Telefone comercial</dt>
+          <dd class="col-7 col-md-9 sge-numerico">{{ responsavel.telefone_trabalho | telefone }}</dd>
+        </dl>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

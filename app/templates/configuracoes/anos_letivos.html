@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Anos letivos{% endblock %}
+{% block titulo_pagina %}Configuracoes{% endblock %}
+
+{% block subtitulo %}
+  <p>Periodos anuais que organizam turmas, matriculas e lancamentos.</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if pode_editar %}
+    <a href="{{ url_for('configuracoes.novo_ano_letivo') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Novo ano letivo
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+  {% include 'configuracoes/_navegacao.html' %}
+
+  {% if anos %}
+    <div class="d-flex flex-column gap-3">
+      {% for ano in anos %}
+        <div class="card {{ 'border-primary' if ano.corrente }}">
+          <div class="card-header flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2 min-w-0">
+              <i class="bi bi-calendar3 text-primary"></i>
+              <span class="fs-6">{{ ano.ano }}</span>
+              {% if ano.corrente %}
+                <span class="badge text-bg-primary">Corrente</span>
+              {% endif %}
+              <span class="badge sge-badge-suave text-bg-{{ ano.situacao.cor }}">
+                {{ ano.situacao.rotulo }}
+              </span>
+            </div>
+
+            {% if pode_editar %}
+              <div class="ms-auto d-flex flex-wrap gap-2">
+                {% if not ano.corrente and not ano.esta_encerrado %}
+                  <form method="post"
+                        action="{{ url_for('configuracoes.definir_ano_corrente', ano_id=ano.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Definir como corrente"
+                        data-confirmar-texto="Todas as telas do sistema passarao a usar {{ ano.ano }} como contexto padrao."
+                        data-confirmar-botao="Definir"
+                        data-confirmar-cor="primary">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-star"></i> Tornar corrente
+                    </button>
+                  </form>
+                {% endif %}
+
+                <a href="{{ url_for('configuracoes.editar_ano_letivo', ano_id=ano.id) }}"
+                   class="btn btn-sm btn-light">
+                  <i class="bi bi-pencil"></i> Editar
+                </a>
+
+                {% if not ano.esta_encerrado %}
+                  <form method="post"
+                        action="{{ url_for('configuracoes.encerrar_ano_letivo', ano_id=ano.id) }}"
+                        data-confirmar
+                        data-confirmar-titulo="Encerrar ano letivo"
+                        data-confirmar-texto="Notas e frequencia de {{ ano.ano }} passarao a ser somente leitura. Esta acao protege o historico ja emitido."
+                        data-confirmar-botao="Encerrar ano"
+                        data-confirmar-cor="warning">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                      <i class="bi bi-lock"></i> Encerrar
+                    </button>
+                  </form>
+                {% endif %}
+
+                <form method="post"
+                      action="{{ url_for('configuracoes.excluir_ano_letivo', ano_id=ano.id) }}"
+                      data-confirmar
+                      data-confirmar-titulo="Excluir ano letivo"
+                      data-confirmar-texto="So e possivel excluir anos letivos sem turmas vinculadas."
+                      data-confirmar-botao="Excluir">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-light sge-btn-icone text-danger"
+                          data-bs-toggle="tooltip" title="Excluir">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="card-body">
+            <div class="row g-3 small mb-3">
+              <div class="col-6 col-md-3">
+                <span class="sge-texto-suave d-block">Periodo letivo</span>
+                <strong class="sge-numerico">
+                  {{ ano.data_inicio | data }} a {{ ano.data_fim | data }}
+                </strong>
+              </div>
+              <div class="col-6 col-md-3">
+                <span class="sge-texto-suave d-block">Media de aprovacao</span>
+                <strong class="sge-numerico">{{ ano.media_aprovacao | nota }}</strong>
+              </div>
+              <div class="col-6 col-md-3">
+                <span class="sge-texto-suave d-block">Frequencia minima</span>
+                <strong class="sge-numerico">{{ ano.frequencia_minima | percentual(0) }}</strong>
+              </div>
+              <div class="col-6 col-md-3">
+                <span class="sge-texto-suave d-block">Turmas</span>
+                <strong class="sge-numerico">{{ ano.turmas | length }}</strong>
+              </div>
+            </div>
+
+            {% if ano.periodos %}
+              <h6 class="small text-uppercase sge-texto-fraco mb-2">Periodos</h6>
+              <div class="sge-tabela-wrapper">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th class="d-none d-md-table-cell">Inicio</th>
+                      <th class="d-none d-md-table-cell">Termino</th>
+                      <th class="text-center">Situacao</th>
+                      {% if pode_editar %}<th class="sge-tabela-acoes">Acoes</th>{% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for periodo in ano.periodos %}
+                      <tr>
+                        <td class="small fw-semibold">
+                          {{ periodo.nome }}
+                          {% if periodo.esta_vigente %}
+                            <span class="badge text-bg-light ms-1">atual</span>
+                          {% endif %}
+                        </td>
+                        <td class="d-none d-md-table-cell small sge-numerico">
+                          {{ periodo.data_inicio | data }}
+                        </td>
+                        <td class="d-none d-md-table-cell small sge-numerico">
+                          {{ periodo.data_fim | data }}
+                        </td>
+                        <td class="text-center">
+                          <span class="badge sge-badge-suave text-bg-{{ 'secondary' if periodo.encerrado else 'success' }}">
+                            {{ 'Encerrado' if periodo.encerrado else 'Aberto' }}
+                          </span>
+                        </td>
+                        {% if pode_editar %}
+                          <td class="sge-tabela-acoes">
+                            <form method="post"
+                                  action="{{ url_for('configuracoes.alternar_periodo', periodo_id=periodo.id) }}">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <button type="submit" class="btn btn-sm btn-light sge-btn-icone"
+                                      data-bs-toggle="tooltip"
+                                      title="{{ 'Reabrir periodo' if periodo.encerrado else 'Encerrar periodo' }}">
+                                <i class="bi bi-{{ 'unlock' if periodo.encerrado else 'lock' }}"></i>
+                              </button>
+                            </form>
+                          </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="small sge-texto-fraco mb-0">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Nenhum periodo cadastrado. Sem periodos nao e possivel criar
+                avaliacoes.
+              </p>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-calendar-x"></i>
+      <h5>Nenhum ano letivo cadastrado</h5>
+      <p class="mb-3">
+        O ano letivo e a base de turmas, matriculas e lancamentos.
+      </p>
+      {% if pode_editar %}
+        <a href="{{ url_for('configuracoes.novo_ano_letivo') }}" class="btn btn-primary">
+          <i class="bi bi-plus-lg"></i> Criar ano letivo
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

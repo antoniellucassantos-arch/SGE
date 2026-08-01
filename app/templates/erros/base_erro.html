@@ -1,0 +1,50 @@
+{# ===========================================================================
+   Layout das paginas de erro.
+
+   Autonomo de proposito: um erro 500 pode ter sido causado justamente pela
+   sessao, pelo banco ou pelo contexto de template. Herdar de ``base.html``
+   arriscaria falhar ao renderizar a propria pagina de erro.
+   =========================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Erro{% endblock %} &middot; SGE</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sge.css') }}">
+</head>
+<body>
+<div class="d-flex align-items-center justify-content-center p-3" style="min-height:100vh;min-height:100dvh;">
+  <div class="text-center" style="max-width: 520px;">
+
+    <div class="sge-indicador__icone {% block cor_icone %}sge-icone--neutro{% endblock %} mx-auto mb-4"
+         style="width:80px;height:80px;font-size:2.2rem;">
+      <i class="bi {% block icone %}bi-exclamation-circle{% endblock %}"></i>
+    </div>
+
+    <div class="display-4 fw-bold sge-texto-fraco mb-1">{% block codigo %}Erro{% endblock %}</div>
+    <h1 class="h4 mb-2">{% block cabecalho %}Algo deu errado{% endblock %}</h1>
+    <p class="sge-texto-suave mb-4">
+      {% block descricao %}Nao foi possivel concluir sua solicitacao.{% endblock %}
+    </p>
+
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+      {% block acoes %}
+        <a href="{{ url_for('painel.index') }}" class="btn btn-primary">
+          <i class="bi bi-house"></i> Ir para o painel
+        </a>
+        <button type="button" class="btn btn-light" onclick="history.back()">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+      {% endblock %}
+    </div>
+
+    {% block extra %}{% endblock %}
+  </div>
+</div>
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

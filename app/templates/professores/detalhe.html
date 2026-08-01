@@ -1,0 +1,170 @@
+{% extends 'pessoas/detalhe_base.html' %}
+{% set registro = professor %}
+
+{% block emblemas_extras %}
+  {% if professor.titulacao %}
+    <span class="badge sge-badge-suave text-bg-info">
+      <i class="bi bi-award me-1"></i>{{ professor.titulacao }}
+    </span>
+  {% endif %}
+  {% if professor.tem_sobrecarga %}
+    <span class="badge sge-badge-suave text-bg-warning">
+      <i class="bi bi-exclamation-triangle me-1"></i>Carga acima do contrato
+    </span>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo_especifico %}
+
+  {# --- Indicadores funcionais --- #}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--primaria"><i class="bi bi-diagram-3"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">{{ vinculos | length }}</div>
+          <div class="sge-indicador__rotulo">Vinculos</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--info"><i class="bi bi-book"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">{{ professor.disciplinas_lecionadas | length }}</div>
+          <div class="sge-indicador__rotulo">Disciplinas</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--{{ 'alerta' if professor.tem_sobrecarga else 'sucesso' }}">
+          <i class="bi bi-clock"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor sge-numerico">
+            {{ professor.carga_horaria_atribuida }}<span class="fs-6 sge-texto-fraco">/{{ professor.carga_horaria_semanal }}</span>
+          </div>
+          <div class="sge-indicador__rotulo">Aulas semanais</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="sge-indicador">
+        <div class="sge-indicador__icone sge-icone--neutro"><i class="bi bi-calendar-check"></i></div>
+        <div class="min-w-0">
+          <div class="sge-indicador__valor" style="font-size:1.1rem;">
+            {{ professor.data_admissao | data }}
+          </div>
+          <div class="sge-indicador__rotulo">Admissao</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Formacao --- #}
+  {% if professor.formacao or professor.instituicao_formacao %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-mortarboard text-primary"></i> Formacao academica</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-4 col-md-3 sge-texto-suave">Formacao</dt>
+          <dd class="col-8 col-md-9">{{ professor.formacao or '—' }}</dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Titulacao</dt>
+          <dd class="col-8 col-md-9">{{ professor.titulacao or '—' }}</dd>
+          <dt class="col-4 col-md-3 sge-texto-suave">Instituicao</dt>
+          <dd class="col-8 col-md-9">{{ professor.instituicao_formacao or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Turmas e disciplinas --- #}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-grid text-primary"></i> Turmas e disciplinas
+      {% if ano_letivo_atual %}
+        <span class="ms-auto small fw-normal sge-texto-fraco">
+          Ano letivo {{ ano_letivo_atual.ano }}
+        </span>
+      {% endif %}
+    </div>
+    <div class="card-body p-0">
+      {% if vinculos %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Disciplina</th>
+                <th>Turma</th>
+                <th class="d-none d-md-table-cell">Turno</th>
+                <th class="text-center">Aulas/sem.</th>
+                <th class="text-center">Situacao</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for vinculo in vinculos %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="sge-ponto"
+                            style="background: {{ vinculo.disciplina.cor if vinculo.disciplina else '#6c757d' }};"></span>
+                      <span class="fw-semibold">
+                        {{ vinculo.disciplina.nome if vinculo.disciplina else '?' }}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    {% if vinculo.turma %}
+                      <a href="{{ url_for('turmas.detalhe', turma_id=vinculo.turma.id) }}"
+                         class="text-reset text-decoration-none">
+                        {{ vinculo.turma.identificacao_curta }}
+                      </a>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="d-none d-md-table-cell small">
+                    {{ vinculo.turma.turno.rotulo if vinculo.turma else '—' }}
+                  </td>
+                  <td class="text-center sge-numerico">{{ vinculo.carga_horaria_semanal }}</td>
+                  <td class="text-center">
+                    <span class="badge sge-badge-suave text-bg-{{ 'success' if vinculo.ativa else 'secondary' }}">
+                      {{ 'Ativa' if vinculo.ativa else 'Inativa' }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-inbox"></i>
+          <h5>Nenhuma disciplina atribuida</h5>
+          <p class="mb-0 small">
+            As atribuicoes sao feitas na tela de cada turma.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Turmas em que e regente --- #}
+  {% if professor.turmas_regidas %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-person-badge text-primary"></i> Regencia de turma
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          {% for turma in professor.turmas_regidas %}
+            <a href="{{ url_for('turmas.detalhe', turma_id=turma.id) }}"
+               class="badge sge-badge-suave text-bg-primary text-decoration-none">
+              <i class="bi bi-diagram-3 me-1"></i>{{ turma.nome_completo }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block titulo_pagina %}{{ titulo }}{% endblock %}
+
+{% block subtitulo %}
+  <p>
+    {% if turma is defined and turma %}
+      {{ turma.nome_completo }}
+      {% if turma.sala %} &middot; sala {{ turma.sala.nome }}{% endif %}
+    {% else %}
+      Grade semanal de aulas.
+    {% endif %}
+  </p>
+{% endblock %}
+
+{% block acoes %}
+  <button type="button" class="btn btn-light" data-imprimir>
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+{% endblock %}
+
+{% block conteudo %}
+
+  {% if grade.tempos %}
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-calendar-week text-primary"></i> Grade semanal
+      </div>
+      <div class="card-body">
+        <div class="sge-tabela-wrapper">
+          <table class="sge-grade-horarios">
+            <thead>
+              <tr>
+                <th style="min-width:110px;">Horario</th>
+                {% for dia in grade.dias %}
+                  <th>
+                    <span class="d-none d-md-inline">{{ dia.rotulo }}</span>
+                    <span class="d-md-none">{{ dia.abreviacao }}</span>
+                  </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for tempo in grade.tempos %}
+                <tr>
+                  <th style="text-align:left;">
+                    <div>{{ tempo.nome }}</div>
+                    <div class="fw-normal sge-texto-fraco" style="font-size:.68rem;">
+                      {{ tempo.faixa }}
+                    </div>
+                  </th>
+
+                  {% if tempo.e_intervalo %}
+                    <td colspan="{{ grade.dias | length }}"
+                        style="background: var(--sge-alerta-suave); color: var(--sge-alerta);">
+                      <i class="bi bi-cup-hot me-1"></i> {{ tempo.nome }}
+                    </td>
+                  {% else %}
+                    {% for dia in grade.dias %}
+                      {% set horario = grade.matriz.get(tempo.id, {}).get(dia.value) %}
+                      <td>
+                        {% if horario %}
+                          <div class="sge-aula p-2 rounded" style="background: {{ horario.cor }};">
+                            <div>{{ horario.nome_disciplina | truncar(18, '') }}</div>
+                            {% if mostrar_turma and horario.turma %}
+                              <small class="d-block">
+                                <i class="bi bi-people"></i> {{ horario.turma.identificacao_curta }}
+                              </small>
+                            {% elif horario.professor %}
+                              <small class="d-block">{{ horario.professor.primeiro_nome }}</small>
+                            {% endif %}
+                            {% if horario.sala_efetiva %}
+                              <small class="d-block">
+                                <i class="bi bi-geo-alt"></i> {{ horario.sala_efetiva.nome }}
+                              </small>
+                            {% endif %}
+                          </div>
+                        {% else %}
+                          <span class="sge-texto-fraco">—</span>
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="sge-vazio">
+      <i class="bi bi-calendar-x"></i>
+      <h5>Nenhum horario cadastrado</h5>
+      <p class="mb-0">
+        A grade de horarios ainda nao foi montada pela coordenacao.
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}

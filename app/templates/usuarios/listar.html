@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% from 'componentes/paginacao.html' import paginacao, coluna_ordenavel, linha_sem_resultado %}
+{% from 'componentes/indicador.html' import indicador %}
+
+{% block titulo %}Usuarios{% endblock %}
+{% block titulo_pagina %}Usuarios e acessos{% endblock %}
+
+{% block subtitulo %}
+  <p>Contas que podem entrar no sistema e seus perfis de permissao.</p>
+{% endblock %}
+
+{% block acoes %}
+  {% if tem_permissao(Permissao.USUARIO_CRIAR) %}
+    <a href="{{ url_for('usuarios.novo') }}" class="btn btn-primary">
+      <i class="bi bi-person-plus"></i> Nova conta
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# --- Resumo por perfil --- #}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      {{ indicador('Total de contas', estatisticas.total, 'bi-shield-lock', 'primaria') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Professores', estatisticas.professor, 'bi-person-video3', 'sucesso') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Responsaveis', estatisticas.responsavel, 'bi-person-heart', 'info') }}
+    </div>
+    <div class="col-6 col-lg-3">
+      {{ indicador('Administradores', estatisticas.administrador, 'bi-shield-fill-check', 'perigo') }}
+    </div>
+  </div>
+
+  {# --- Filtros --- #}
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-5">
+          <label for="{{ form.busca.id }}" class="form-label">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            {{ form.busca(class="form-control", placeholder="Nome, e-mail ou CPF") }}
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label for="{{ form.papel.id }}" class="form-label">Perfil</label>
+          {{ form.papel(class="form-select") }}
+        </div>
+        <div class="col-6 col-md-2">
+          <label for="{{ form.situacao.id }}" class="form-label">Situacao</label>
+          {{ form.situacao(class="form-select") }}
+        </div>
+        <div class="col-12 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          {% if request.args %}
+            <a href="{{ url_for('usuarios.listar') }}" class="btn btn-light">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# --- Tabela --- #}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-shield-lock text-primary"></i> Contas de acesso
+      <span class="badge sge-badge-suave ms-2 sge-numerico">{{ pagina.total }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if pagina.items %}
+        <div class="sge-tabela-wrapper">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                {{ coluna_ordenavel('Usuario', 'nome', 'usuarios.listar', ordenacao, parametros) }}
+                {{ coluna_ordenavel('E-mail', 'email', 'usuarios.listar', ordenacao, parametros, 'd-none d-md-table-cell') }}
+                {{ coluna_ordenavel('Perfil', 'papel', 'usuarios.listar', ordenacao, parametros) }}
+                {{ coluna_ordenavel('Ultimo acesso', 'ultimo_login', 'usuarios.listar', ordenacao, parametros, 'd-none d-lg-table-cell') }}
+                <th class="text-center">Situacao</th>
+                <th class="sge-tabela-acoes">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for usuario in pagina.items %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('usuarios.detalhe', usuario_id=usuario.id) }}"
+                       class="d-flex align-items-center gap-2 text-reset text-decoration-none">
+                      {% if usuario.foto %}
+                        <img src="{{ url_for('static', filename='uploads/usuarios/' ~ usuario.foto) }}"
+                             alt="" class="sge-avatar sge-avatar--sm">
+                      {% else %}
+                        <span class="sge-avatar sge-avatar--sm">{{ usuario.iniciais }}</span>
+                      {% endif %}
+                      <span class="min-w-0">
+                        <span class="d-block fw-semibold text-truncate">
+                          {{ usuario.nome_completo }}
+                        </span>
+                        <span class="d-block small sge-texto-fraco text-truncate d-md-none">
+                          {{ usuario.email }}
+                        </span>
+                      </span>
+                    </a>
+                  </td>
+                  <td class="d-none d-md-table-cell small sge-quebra">{{ usuario.email }}</td>
+                  <td>
+                    <span class="badge sge-badge-suave text-bg-{{ usuario.papel.cor }}">
+                      {{ usuario.papel.rotulo }}
+                    </span>
+                  </td>
+                  <td class="d-none d-lg-table-cell small">
+                    {% if usuario.ultimo_login_em %}
+                      {{ usuario.ultimo_login_em | tempo_relativo }}
+                    {% else %}
+                      <span class="sge-texto-fraco">Nunca acessou</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if usuario.esta_bloqueado %}
+                      <span class="badge sge-badge-suave text-bg-warning">
+                        <i class="bi bi-lock-fill"></i> Bloqueada
+                      </span>
+                    {% elif usuario.ativo %}
+                      <span class="badge sge-badge-suave text-bg-success">Ativa</span>
+                    {% else %}
+                      <span class="badge sge-badge-suave text-bg-secondary">Inativa</span>
+                    {% endif %}
+                  </td>
+                  <td class="sge-tabela-acoes">
+                    <a href="{{ url_for('usuarios.detalhe', usuario_id=usuario.id) }}"
+                       class="btn btn-sm btn-light sge-btn-icone"
+                       data-bs-toggle="tooltip" title="Ver conta">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    {% if tem_permissao(Permissao.USUARIO_EDITAR) %}
+                      <a href="{{ url_for('usuarios.editar', usuario_id=usuario.id) }}"
+                         class="btn btn-sm btn-light sge-btn-icone"
+                         data-bs-toggle="tooltip" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {{ linha_sem_resultado(6) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="sge-vazio">
+          <i class="bi bi-shield-lock"></i>
+          <h5>Nenhuma conta encontrada</h5>
+          <p class="mb-0">Nenhum registro corresponde aos filtros aplicados.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ paginacao(pagina, 'usuarios.listar', parametros, 'contas') }}
+
+{% endblock %}
