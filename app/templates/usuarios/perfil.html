@@ -20,7 +20,7 @@
         <div class="card-body">
           <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
             {% if current_user.foto %}
-              <img src="{{ url_for('static', filename='uploads/usuarios/' ~ current_user.foto) }}"
+              <img src="{{ url_for('usuarios.foto', usuario_id=current_user.id) }}"
                    alt="" class="sge-avatar sge-avatar--lg">
             {% else %}
               <span class="sge-avatar sge-avatar--lg">{{ current_user.iniciais }}</span>

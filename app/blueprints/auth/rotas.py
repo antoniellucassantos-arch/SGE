@@ -7,8 +7,6 @@ aqui — todas vivem no service, onde podem ser testadas isoladamente.
 
 from __future__ import annotations
 
-from urllib.parse import urljoin, urlparse
-
 from flask import (
     current_app,
     flash,
@@ -29,38 +27,7 @@ from app.blueprints.auth.formularios import (
 from app.extensions import limiter
 from app.services import auditoria_service, auth_service
 from app.services.excecoes import ErroAutenticacao, ErroValidacao
-
-
-def _destino_seguro(destino: str | None) -> str:
-    """Valida o parametro ``next`` antes de redirecionar.
-
-    Sem esta checagem, ``/auth/login?next=https://site-malicioso`` faria o
-    sistema redirecionar o usuario recem-autenticado para fora do dominio
-    (*open redirect*), tecnica classica de phishing.
-    """
-    padrao = url_for("painel.index")
-    if not destino:
-        return padrao
-
-    referencia = urlparse(request.host_url)
-    candidato = urlparse(urljoin(request.host_url, destino))
-
-    mesmo_host = (
-        candidato.scheme in ("http", "https")
-        and referencia.netloc == candidato.netloc
-    )
-    if not mesmo_host:
-        return padrao
-
-    caminho = candidato.path
-    if candidato.query:
-        caminho = f"{caminho}?{candidato.query}"
-
-    # Evita devolver o usuario para a propria tela de login.
-    if caminho.startswith(url_for("auth.login")):
-        return padrao
-
-    return caminho or padrao
+from app.utils.navegacao import destino_pos_login
 
 
 def _aplicar_erros(form, erros_por_campo: dict[str, list[str]]) -> None:
@@ -107,7 +74,7 @@ def login():
             return redirect(url_for("auth.alterar_senha"))
 
         flash(f"Bem-vindo(a), {usuario.primeiro_nome}!", "success")
-        return redirect(_destino_seguro(request.args.get("next")))
+        return redirect(destino_pos_login(request.args.get("next")))
 
     return render_template("auth/login.html", form=form)
 

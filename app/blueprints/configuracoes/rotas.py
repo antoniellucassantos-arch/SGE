@@ -19,7 +19,7 @@ from app.models.estrutura import PeriodoLetivo, Sala, Serie
 from app.models.horario import TempoAula
 from app.services import configuracao_service
 from app.services.excecoes import ErroArquivo, ErroDominio, RegistroNaoEncontrado
-from app.utils.arquivos import substituir_imagem
+from app.utils.arquivos import responder_arquivo, substituir_imagem
 from app.utils.decoradores import requer_permissao
 from app.utils.permissoes import Permissao
 
@@ -409,3 +409,15 @@ def _primeiro_erro(form) -> str:
         if mensagens:
             return mensagens[0]
     return "Dados invalidos."
+
+
+@bp.route("/logo")
+def logo():
+    """Entrega o logo da escola.
+
+    Unica rota de upload sem autenticacao, e de proposito: o logo aparece na
+    tela de login, antes de qualquer sessao existir. Um logo institucional e
+    informacao publica — diferente de foto de aluno.
+    """
+    escola = configuracao_service.obter_escola()
+    return responder_arquivo(PASTA_LOGO, escola.logo)

@@ -43,7 +43,7 @@
   <aside class="sge-lateral" id="barraLateral">
     <div class="sge-lateral__marca">
       {% if escola and escola.logo %}
-        <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+        <img src="{{ url_for('configuracoes.logo') }}"
              alt="Logo da escola" class="sge-lateral__logo">
       {% else %}
         <div class="sge-lateral__logo" aria-hidden="true">
@@ -136,7 +136,7 @@
                   type="button" data-bs-toggle="dropdown" aria-expanded="false"
                   aria-label="Menu do usuario">
             {% if current_user.foto %}
-              <img src="{{ url_for('static', filename='uploads/usuarios/' ~ current_user.foto) }}"
+              <img src="{{ url_for('usuarios.foto', usuario_id=current_user.id) }}"
                    alt="" class="sge-avatar">
             {% else %}
               <span class="sge-avatar">{{ current_user.iniciais }}</span>

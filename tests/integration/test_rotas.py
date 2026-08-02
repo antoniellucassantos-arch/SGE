@@ -15,6 +15,7 @@ manter atualizada.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 from flask import url_for
@@ -83,6 +84,15 @@ def base_completa(app, admin, ano_letivo, turma, disciplina, professor,
     db.session.add(avaliacao)
     db.session.commit()
 
+    # As rotas de foto servem arquivo real: sem ele responderiam 404 e o
+    # teste de fumaca nao exercitaria o caminho de entrega autenticada.
+    _gravar_foto(app, "alunos", aluno)
+    _gravar_foto(app, "professores", professor)
+    _gravar_foto(app, "funcionarios", funcionario)
+    _gravar_foto(app, "responsaveis", responsavel)
+    _gravar_foto(app, "usuarios", admin)
+    _gravar_logo(app)
+
     registro_auditoria = db.session.query(LogAuditoria).first()
 
     return {
@@ -110,6 +120,40 @@ def base_completa(app, admin, ano_letivo, turma, disciplina, professor,
         "horario_id": 1,
         "token": "token-invalido",
     }
+
+
+def _gravar_foto(app, subpasta: str, registro) -> None:
+    """Cria uma imagem minima e vincula ao registro."""
+    from PIL import Image
+
+    from app.utils.arquivos import gerar_nome_arquivo
+
+    pasta = Path(app.config["PASTA_UPLOADS"]) / subpasta
+    pasta.mkdir(parents=True, exist_ok=True)
+
+    nome = gerar_nome_arquivo("jpg")
+    Image.new("RGB", (8, 8), "#1a56db").save(pasta / nome, "JPEG")
+
+    registro.foto = nome
+    db.session.commit()
+
+
+def _gravar_logo(app) -> None:
+    """Grava o logo da escola, usado pela rota publica de identidade visual."""
+    from PIL import Image
+
+    from app.models.sistema import ConfiguracaoEscola
+    from app.utils.arquivos import gerar_nome_arquivo
+
+    pasta = Path(app.config["PASTA_UPLOADS"]) / "escola"
+    pasta.mkdir(parents=True, exist_ok=True)
+
+    nome = gerar_nome_arquivo("jpg")
+    Image.new("RGB", (8, 8), "#057a55").save(pasta / nome, "JPEG")
+
+    escola = ConfiguracaoEscola.obter()
+    escola.logo = nome
+    db.session.commit()
 
 
 def _rotas_get(app):

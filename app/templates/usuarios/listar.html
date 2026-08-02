@@ -95,7 +95,7 @@
                     <a href="{{ url_for('usuarios.detalhe', usuario_id=usuario.id) }}"
                        class="d-flex align-items-center gap-2 text-reset text-decoration-none">
                       {% if usuario.foto %}
-                        <img src="{{ url_for('static', filename='uploads/usuarios/' ~ usuario.foto) }}"
+                        <img src="{{ url_for('usuarios.foto', usuario_id=usuario.id) }}"
                              alt="" class="sge-avatar sge-avatar--sm">
                       {% else %}
                         <span class="sge-avatar sge-avatar--sm">{{ usuario.iniciais }}</span>

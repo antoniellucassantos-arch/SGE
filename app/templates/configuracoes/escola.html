@@ -76,7 +76,7 @@
           </div>
           <div class="card-body text-center">
             {% if escola.logo %}
-              <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+              <img src="{{ url_for('configuracoes.logo') }}"
                    alt="Logo da escola" class="img-fluid mb-3 rounded"
                    style="max-height: 120px;">
             {% else %}

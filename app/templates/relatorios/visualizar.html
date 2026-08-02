@@ -51,19 +51,19 @@
           </select>
         </div>
 
-        {% if chave in ['alunos'] %}
-          <div class="col-6 col-md-3">
-            <label class="form-label" for="filtroTurma">Turma</label>
-            <select class="form-select" name="turma_id" id="filtroTurma">
-              <option value="">Todas</option>
-              {% for turma in turmas %}
-                <option value="{{ turma.id }}" {{ 'selected' if filtros.turma_id == turma.id }}>
-                  {{ turma.identificacao_curta }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-        {% endif %}
+        {# O <select> lista apenas as turmas do escopo do usuario — a rota
+           monta essa lista com `usuario=current_user`. #}
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="filtroTurma">Turma</label>
+          <select class="form-select" name="turma_id" id="filtroTurma">
+            <option value="">{{ 'Todas as minhas turmas' if not current_user.e_equipe_interna or current_user.e_professor else 'Todas' }}</option>
+            {% for turma in turmas %}
+              <option value="{{ turma.id }}" {{ 'selected' if filtros.turma_id == turma.id }}>
+                {{ turma.identificacao_curta }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
 
         <div class="col-6 col-md-2 d-flex gap-2">
           <button type="submit" class="btn btn-primary flex-grow-1">

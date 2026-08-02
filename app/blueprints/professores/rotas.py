@@ -15,7 +15,7 @@ from app.models.estrutura import Turma, TurmaDisciplina
 from app.models.pessoas import Professor
 from app.services import pessoa_service
 from app.services.excecoes import ErroArquivo, ErroDominio
-from app.utils.arquivos import substituir_imagem
+from app.utils.arquivos import responder_arquivo, substituir_imagem
 from app.utils.decoradores import requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
@@ -52,6 +52,7 @@ CONTEXTO = {
         "detalhe": "professores.detalhe",
         "excluir": "professores.excluir",
         "criar_acesso": "professores.criar_acesso",
+        "foto": "professores.foto",
     },
     "permissoes": {
         "criar": Permissao.PROFESSOR_CRIAR,
@@ -229,3 +230,12 @@ def _processar_foto(form: ProfessorForm, foto_atual: str | None) -> str | None:
         quadrada=True,
         largura_maxima=400,
     )
+
+
+@bp.route("/<int:professor_id>/foto")
+@login_required
+@requer_permissao(Permissao.PROFESSOR_VISUALIZAR)
+def foto(professor_id: int):
+    """Entrega a foto do professor a quem pode visualizar o cadastro."""
+    professor = pessoa_service.professores.buscar(professor_id)
+    return responder_arquivo(PASTA_FOTOS, professor.foto)

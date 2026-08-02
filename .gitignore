@@ -34,10 +34,11 @@ instance/
 *.sqlite
 *.sqlite3
 
-# Uploads enviados por usuarios (ficam sob app/static/ para o Nginx servir)
-app/static/uploads/*
-!app/static/uploads/.gitkeep
-!app/static/uploads/**/.gitkeep
+# Uploads enviados por usuarios.
+# Ficam FORA de app/static/: sao dados pessoais (foto de aluno) e so podem
+# sair por rota autenticada.
+uploads/
+
 
 # Backups gerados pelo sistema
 database/backups/*

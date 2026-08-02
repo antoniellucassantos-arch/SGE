@@ -72,7 +72,7 @@
       {# Marca compacta, exibida quando a vitrine esta oculta #}
       <div class="text-center d-lg-none">
         {% if escola and escola.logo %}
-          <img src="{{ url_for('static', filename='uploads/escola/' ~ escola.logo) }}"
+          <img src="{{ url_for('configuracoes.logo') }}"
                alt="Logo da escola" class="sge-login__marca">
         {% else %}
           <div class="sge-login__marca"><i class="bi bi-mortarboard-fill"></i></div>

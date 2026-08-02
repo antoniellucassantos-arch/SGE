@@ -13,8 +13,8 @@ from app.blueprints.usuarios.formularios import (
 )
 from app.models.usuario import Usuario
 from app.services import auditoria_service, usuario_service
-from app.services.excecoes import ErroArquivo, ErroDominio
-from app.utils.arquivos import substituir_imagem
+from app.services.excecoes import ErroArquivo, ErroDominio, ErroPermissao
+from app.utils.arquivos import responder_arquivo, substituir_imagem
 from app.utils.decoradores import requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
@@ -22,7 +22,11 @@ from app.utils.paginacao import (
     paginar,
     parametros_preservados,
 )
-from app.utils.permissoes import Permissao, permissoes_do_papel
+from app.utils.permissoes import (
+    Permissao,
+    permissoes_do_papel,
+    usuario_tem_permissao,
+)
 
 PASTA_FOTOS = "usuarios"
 
@@ -240,3 +244,21 @@ def perfil():
             return redirect(url_for("usuarios.perfil"))
 
     return render_template("usuarios/perfil.html", form=form)
+
+
+@bp.route("/<int:usuario_id>/foto")
+@login_required
+def foto(usuario_id: int):
+    """Entrega o avatar de um usuario.
+
+    A propria foto e sempre acessivel; a de terceiros exige permissao de
+    visualizacao de usuarios. O avatar aparece na barra superior de todas as
+    telas, entao a rota precisa ser barata e tolerante.
+    """
+    if usuario_id != current_user.id and not usuario_tem_permissao(
+        current_user, Permissao.USUARIO_VISUALIZAR
+    ):
+        raise ErroPermissao("Voce nao tem acesso a este arquivo.")
+
+    usuario = usuario_service.buscar(usuario_id)
+    return responder_arquivo(PASTA_FOTOS, usuario.foto)

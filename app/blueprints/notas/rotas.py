@@ -67,7 +67,15 @@ def _periodo_selecionado(vinculo) -> int | None:
 @login_required
 @requer_permissao(Permissao.NOTA_VISUALIZAR)
 def index():
-    """Lista as disciplinas cujas notas o usuario pode acessar."""
+    """Lista as disciplinas cujas notas o usuario pode acessar.
+
+    Aluno e responsavel tambem possuem ``NOTA_VISUALIZAR`` — mas para ver o
+    proprio boletim. Sem o desvio abaixo, esta tela lhes daria acesso as
+    notas de todas as turmas.
+    """
+    if not current_user.e_equipe_interna:
+        return redirect(url_for("boletim.meu_boletim"))
+
     if current_user.e_professor:
         vinculos = frequencia_service.vinculos_do_professor(
             current_user.professor, _ano_letivo_id()

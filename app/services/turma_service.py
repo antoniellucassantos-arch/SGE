@@ -42,15 +42,80 @@ def buscar_turma(turma_id: int | str | None) -> Turma:
     return turma
 
 
+def turmas_no_escopo_do_usuario(usuario) -> set[int] | None:
+    """Ids das turmas que o usuario pode enxergar.
+
+    Returns:
+        ``None`` quando o usuario ve a escola inteira (admin, direcao,
+        secretaria); caso contrario, o conjunto de ids permitidos.
+
+    Devolver o conjunto — e nao um booleano — permite que o filtro seja
+    aplicado **na consulta SQL**. Filtrar depois, no template, ainda traria
+    os dados de outras turmas para a memoria e para os relatorios exportados.
+    """
+    from app.models.enums import PapelUsuario, SituacaoMatricula
+    from app.models.matricula import Matricula
+
+    if usuario is None or not getattr(usuario, "is_authenticated", False):
+        return set()
+
+    if usuario.tem_papel(
+        PapelUsuario.ADMINISTRADOR, PapelUsuario.DIRECAO, PapelUsuario.SECRETARIA
+    ):
+        return None
+
+    if usuario.e_professor and usuario.professor:
+        return {
+            vinculo.turma_id
+            for vinculo in usuario.professor.turmas_disciplinas
+            if vinculo.ativa
+        }
+
+    # Aluno e responsavel enxergam apenas as turmas em que ha matricula ativa
+    # sua ou dos dependentes.
+    ids_alunos: set[int] = set()
+    if usuario.e_aluno and usuario.aluno:
+        ids_alunos = {usuario.aluno.id}
+    elif usuario.e_responsavel and usuario.responsavel:
+        ids_alunos = usuario.responsavel.ids_alunos
+
+    if not ids_alunos:
+        return set()
+
+    return {
+        linha[0]
+        for linha in db.session.query(Matricula.turma_id)
+        .filter(
+            Matricula.aluno_id.in_(ids_alunos),
+            Matricula.situacao == SituacaoMatricula.ATIVA,
+            Matricula.excluido_em.is_(None),
+        )
+        .all()
+    }
+
+
 def listar_turmas(
     termo: str | None = None,
     ano_letivo_id: int | None = None,
     serie_id: int | None = None,
     turno: str | None = None,
     somente_ativas: bool = False,
+    usuario=None,
 ):
-    """Consulta de listagem de turmas com os filtros da tela."""
+    """Consulta de listagem de turmas com os filtros da tela.
+
+    Args:
+        usuario: quando informado, restringe o resultado ao escopo dele.
+            Sem isso, o ``<select>`` de turmas de um relatorio listaria a
+            escola inteira — vazando os nomes e, pior, entregando a lista de
+            ids validos para manipular a querystring.
+    """
     consulta = consulta_turmas().join(Serie, Turma.serie_id == Serie.id)
+
+    if usuario is not None:
+        permitidas = turmas_no_escopo_do_usuario(usuario)
+        if permitidas is not None:
+            consulta = consulta.filter(Turma.id.in_(permitidas or {0}))
 
     if termo:
         alvo = f"%{remover_acentos(termo)}%"

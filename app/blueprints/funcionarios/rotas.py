@@ -13,7 +13,7 @@ from app.blueprints.funcionarios.formularios import (
 from app.models.pessoas import Funcionario
 from app.services import pessoa_service
 from app.services.excecoes import ErroArquivo, ErroDominio
-from app.utils.arquivos import substituir_imagem
+from app.utils.arquivos import responder_arquivo, substituir_imagem
 from app.utils.decoradores import requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
@@ -50,6 +50,7 @@ CONTEXTO = {
         "detalhe": "funcionarios.detalhe",
         "excluir": "funcionarios.excluir",
         "criar_acesso": "funcionarios.criar_acesso",
+        "foto": "funcionarios.foto",
     },
     "permissoes": {
         "criar": Permissao.FUNCIONARIO_CRIAR,
@@ -209,3 +210,12 @@ def _processar_foto(form: FuncionarioForm, foto_atual: str | None) -> str | None
         quadrada=True,
         largura_maxima=400,
     )
+
+
+@bp.route("/<int:funcionario_id>/foto")
+@login_required
+@requer_permissao(Permissao.FUNCIONARIO_VISUALIZAR)
+def foto(funcionario_id: int):
+    """Entrega a foto do funcionario a quem pode visualizar o cadastro."""
+    funcionario = pessoa_service.funcionarios.buscar(funcionario_id)
+    return responder_arquivo(PASTA_FOTOS, funcionario.foto)

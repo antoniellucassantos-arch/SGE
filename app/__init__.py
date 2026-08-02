@@ -279,7 +279,9 @@ def _registrar_handlers_erro(app: Flask) -> None:
         # A pagina e renderizada aqui, e nao com ``abort()``: uma excecao
         # levantada dentro de um error handler nao e redespachada pelo Flask
         # para outro handler — ela sobe como erro nao tratado.
-        from flask import flash, redirect, url_for
+        from flask import flash, redirect
+
+        from app.utils.navegacao import destino_seguro
 
         if erro.codigo_http in (403, 404):
             return (
@@ -287,12 +289,29 @@ def _registrar_handlers_erro(app: Flask) -> None:
                 erro.codigo_http,
             )
 
+        # Falha de infraestrutura (ErroOperacaoBanco) nao pode virar um 302
+        # silencioso: sem status 5xx e sem stack trace, o incidente jamais
+        # aparece no monitoramento.
+        if erro.codigo_http >= 500:
+            db.session.rollback()
+            app.logger.exception("Erro de dominio com falha interna: %s", erro.mensagem)
+            return render_template("erros/500.html"), erro.codigo_http
+
         # Erros de regra de negocio (capacidade da turma, matricula
         # duplicada) sao previsiveis e corrigiveis: a pessoa volta para onde
         # estava, com a explicacao do que impediu a operacao.
+        #
+        # Erros por campo, quando houver, sao exibidos junto da mensagem
+        # principal — sem isso o usuario recebe "dados invalidos" e nao
+        # descobre qual campo corrigir.
         flash(erro.mensagem, "danger")
-        destino = request.referrer or url_for("painel.index")
-        return redirect(destino)
+        for campo, mensagens in getattr(erro, "erros_por_campo", {}).items():
+            for mensagem in mensagens:
+                flash(f"{campo}: {mensagem}", "warning")
+
+        # O Referer e controlado pelo cliente: sem validacao, um link que
+        # dispare um erro previsivel joga o usuario autenticado para fora.
+        return redirect(destino_seguro(request.referrer))
 
 
 def _registrar_hooks(app: Flask) -> None:

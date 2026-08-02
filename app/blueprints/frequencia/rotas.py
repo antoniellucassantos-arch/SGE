@@ -50,7 +50,15 @@ def _garantir_lancamento(vinculo) -> None:
 @login_required
 @requer_permissao(Permissao.FREQUENCIA_VISUALIZAR)
 def index():
-    """Lista as disciplinas cujo diario o usuario pode acessar."""
+    """Lista as disciplinas cujo diario o usuario pode acessar.
+
+    Aluno e responsavel tambem possuem ``FREQUENCIA_VISUALIZAR`` — mas para
+    consultar a **propria** frequencia. Sem o desvio abaixo, esta tela lhes
+    entregaria o diario de todas as turmas da escola.
+    """
+    if not current_user.e_equipe_interna:
+        return redirect(url_for("frequencia.minha_frequencia"))
+
     if current_user.e_professor:
         vinculos = frequencia_service.vinculos_do_professor(
             current_user.professor, _ano_letivo_id()
@@ -66,6 +74,11 @@ def index():
 @requer_permissao(Permissao.FREQUENCIA_VISUALIZAR)
 def pendentes():
     """Aulas registradas cuja chamada ainda nao foi lancada."""
+    if not current_user.e_equipe_interna:
+        raise ErroPermissao(
+            "Esta tela e restrita a equipe da escola."
+        )
+
     consulta = frequencia_service.aulas_pendentes(_ano_letivo_id())
 
     # Professor ve apenas as proprias pendencias.

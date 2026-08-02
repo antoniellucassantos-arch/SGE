@@ -29,12 +29,15 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
+from flask import has_request_context
+from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.avaliacao import Avaliacao, Nota, ResultadoDisciplina
 from app.models.enums import (
+    PapelUsuario,
     ResultadoFinal,
     SituacaoMatricula,
     TipoAvaliacao,
@@ -46,10 +49,12 @@ from app.services import auditoria_service, frequencia_service
 from app.services.excecoes import (
     ErroConflito,
     ErroOperacaoBanco,
+    ErroPermissao,
     ErroRegraNegocio,
     ErroValidacao,
     RegistroNaoEncontrado,
 )
+from app.utils.decoradores import pode_lancar_em_vinculo
 
 #: Duas casas decimais, arredondamento comercial (0,005 -> 0,01).
 CASAS = Decimal("0.01")
@@ -200,8 +205,71 @@ def _validar_periodo(periodo_id: int, vinculo: TurmaDisciplina) -> None:
         )
 
 
-def atualizar_avaliacao(avaliacao: Avaliacao, dados: dict[str, Any]) -> Avaliacao:
+def _garantir_periodo_aberto(
+    avaliacao: Avaliacao, permitir_encerrado: bool = False
+) -> bool:
+    """Bloqueia alteracoes em periodo ou ano letivo encerrado.
+
+    Chamada por **toda** operacao que altera resultado — lancar nota, editar,
+    excluir ou publicar avaliacao. Antes, a trava existia apenas na criacao
+    da avaliacao: o periodo fechava, o boletim saia, o aluno era reprovado e
+    o professor ainda conseguia abrir a grade e mudar a nota.
+
+    Args:
+        permitir_encerrado: Autoriza a alteracao excepcional. Reservado a
+            direcao e administracao (conselho de classe, correcao de erro
+            apurado depois do fechamento).
+
+    Returns:
+        ``True`` quando o periodo estava encerrado e a alteracao foi liberada
+        excepcionalmente — sinal para o chamador registrar a auditoria
+        reforcada.
+
+    Raises:
+        ErroRegraNegocio: periodo ou ano encerrado, sem autorizacao especial.
+        ErroPermissao: reabertura solicitada por quem nao pode reabrir.
+    """
+    periodo = avaliacao.periodo
+    vinculo = avaliacao.turma_disciplina
+    turma = vinculo.turma if vinculo else None
+    ano_letivo = turma.ano_letivo if turma else None
+
+    motivos: list[str] = []
+    if periodo is not None and periodo.encerrado:
+        motivos.append(f"o periodo '{periodo.nome}' esta encerrado")
+    if ano_letivo is not None and not ano_letivo.aceita_lancamentos:
+        motivos.append(f"o ano letivo de {ano_letivo.ano} nao esta em andamento")
+
+    if not motivos:
+        return False
+
+    if not permitir_encerrado:
+        raise ErroRegraNegocio(
+            f"Nao e possivel alterar: {' e '.join(motivos)}. "
+            "A reabertura so pode ser feita pela direcao."
+        )
+
+    # A excecao existe, mas nao e livre: so direcao e administracao reabrem.
+    if has_request_context() and current_user and current_user.is_authenticated:
+        if not current_user.tem_papel(
+            PapelUsuario.ADMINISTRADOR, PapelUsuario.DIRECAO
+        ):
+            raise ErroPermissao(
+                "Apenas a direcao pode alterar lancamentos de um periodo "
+                "encerrado."
+            )
+
+    return True
+
+
+def atualizar_avaliacao(
+    avaliacao: Avaliacao,
+    dados: dict[str, Any],
+    permitir_periodo_encerrado: bool = False,
+) -> Avaliacao:
     """Atualiza os dados de uma avaliacao."""
+    _garantir_periodo_aberto(avaliacao, permitir_periodo_encerrado)
+
     antes = avaliacao.para_dicionario()
     avaliacao.atualizar_campos(**dados)
     alteracoes = auditoria_service.calcular_alteracoes(
@@ -219,12 +287,16 @@ def atualizar_avaliacao(avaliacao: Avaliacao, dados: dict[str, Any]) -> Avaliaca
     return avaliacao
 
 
-def excluir_avaliacao(avaliacao: Avaliacao) -> None:
+def excluir_avaliacao(
+    avaliacao: Avaliacao, permitir_periodo_encerrado: bool = False
+) -> None:
     """Exclui a avaliacao e todas as notas associadas.
 
     Bloqueada quando ja ha notas lancadas: apagar notas de uma turma inteira
     e irreversivel e nunca deve acontecer por um clique acidental.
     """
+    _garantir_periodo_aberto(avaliacao, permitir_periodo_encerrado)
+
     lancadas = avaliacao.total_lancadas()
     if lancadas:
         raise ErroRegraNegocio(
@@ -244,8 +316,18 @@ def excluir_avaliacao(avaliacao: Avaliacao) -> None:
     _confirmar("Falha ao registrar auditoria", propagar=False)
 
 
-def publicar_avaliacao(avaliacao: Avaliacao, publicar: bool = True) -> Avaliacao:
-    """Libera (ou oculta) as notas para alunos e responsaveis."""
+def publicar_avaliacao(
+    avaliacao: Avaliacao,
+    publicar: bool = True,
+    permitir_periodo_encerrado: bool = False,
+) -> Avaliacao:
+    """Libera (ou oculta) as notas para alunos e responsaveis.
+
+    Ocultar uma avaliacao depois do fechamento muda o boletim que a familia
+    ja viu — por isso a operacao respeita a mesma trava de periodo.
+    """
+    _garantir_periodo_aberto(avaliacao, permitir_periodo_encerrado)
+
     avaliacao.publicada = publicar
     _confirmar("Falha ao publicar avaliacao")
 
@@ -300,11 +382,34 @@ def preparar_grade(vinculo: TurmaDisciplina, periodo_id: int) -> dict[str, Any]:
     return {"avaliacoes": avaliacoes, "linhas": linhas}
 
 
+def _garantir_autorizacao_de_lancamento(avaliacao: Avaliacao) -> None:
+    """Verifica, **dentro do service**, quem pode lancar nota.
+
+    A protecao de rota (``@requer_permissao`` + escopo do vinculo) cobre a
+    interface web, mas nao a API nem a CLI — que chamam o service direto.
+    Deixar a unica guarda no decorador significa que qualquer caminho novo
+    nasce desprotegido.
+
+    Quando nao ha contexto de requisicao (comandos ``flask``, seed,
+    migracoes de dados), a operacao e considerada confiavel: quem executa
+    ali ja tem acesso ao servidor e ao banco.
+    """
+    if not has_request_context():
+        return
+
+    if not pode_lancar_em_vinculo(avaliacao.turma_disciplina):
+        raise ErroPermissao(
+            "Apenas o professor titular da disciplina (ou a direcao) pode "
+            "lancar notas nesta turma."
+        )
+
+
 def salvar_notas(
     avaliacao: Avaliacao,
     valores: dict[int, str],
     ausencias: set[int] | None = None,
     usuario_id: int | None = None,
+    permitir_periodo_encerrado: bool = False,
 ) -> int:
     """Grava as notas de uma avaliacao.
 
@@ -312,10 +417,20 @@ def salvar_notas(
         valores: ``{matricula_id: valor_textual}``. Vazio significa
             "nota nao lancada" e limpa o campo.
         ausencias: matriculas marcadas como ausentes na avaliacao.
+        permitir_periodo_encerrado: libera alteracao apos o fechamento.
+            Restrito a direcao e administracao; gera auditoria reforcada.
 
     Returns:
         Quantidade de notas efetivamente alteradas.
+
+    Raises:
+        ErroPermissao: usuario sem vinculo com a disciplina.
+        ErroRegraNegocio: periodo ou ano letivo encerrado.
+        ErroValidacao: nota fora do intervalo da avaliacao.
     """
+    _garantir_autorizacao_de_lancamento(avaliacao)
+    reaberto = _garantir_periodo_aberto(avaliacao, permitir_periodo_encerrado)
+
     ausencias = ausencias or set()
     permitidas = {m.id for m in matriculas_da_turma(avaliacao.turma_disciplina.turma_id)}
 
@@ -327,6 +442,10 @@ def salvar_notas(
     maximo = avaliacao.valor_maximo or Decimal("10")
     alteradas = 0
     problemas: list[str] = []
+
+    # Valores anteriores, para a auditoria de alteracao pos-fechamento: sem
+    # eles nao ha como reconstituir o boletim originalmente emitido.
+    anteriores: dict[int, str] = {}
 
     # O campo de nota fica desabilitado quando o aluno e marcado como ausente,
     # e navegadores nao enviam campos desabilitados. Por isso o conjunto a
@@ -353,6 +472,7 @@ def salvar_notas(
             continue
 
         if registro.valor != valor or registro.ausente != ausente:
+            anteriores[matricula_id] = registro.valor_exibicao
             registro.valor = None if ausente else valor
             registro.ausente = ausente
             registro.alterada_por_id = usuario_id
@@ -367,11 +487,24 @@ def salvar_notas(
     _confirmar("Falha ao salvar notas")
 
     if alteradas:
+        detalhes: dict[str, Any] = {"alteradas": alteradas}
+        descricao = (
+            f"Notas lancadas em {avaliacao.nome}: {alteradas} alteracao(oes)"
+        )
+
+        if reaberto:
+            # Alteracao apos o fechamento muda um boletim ja emitido. O log
+            # precisa permitir reconstituir o que foi trocado, por quem e a
+            # partir de qual valor.
+            descricao = (
+                f"ALTERACAO EM PERIODO ENCERRADO — {avaliacao.nome}: "
+                f"{alteradas} nota(s) modificada(s)"
+            )
+            detalhes["periodo_encerrado"] = True
+            detalhes["valores_anteriores"] = anteriores
+
         auditoria_service.registrar_atualizacao(
-            "Avaliacao",
-            avaliacao.id,
-            f"Notas lancadas em {avaliacao.nome}: {alteradas} alteracao(oes)",
-            {"alteradas": alteradas},
+            "Avaliacao", avaliacao.id, descricao, detalhes
         )
         _confirmar("Falha ao registrar auditoria", propagar=False)
 

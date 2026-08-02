@@ -65,10 +65,14 @@ class BaseConfig:
     # -- Diretorios ---------------------------------------------------------
     BASE_DIR = BASE_DIR
 
-    # Os uploads ficam sob ``app/static/`` para que o Nginx os sirva
-    # diretamente em producao, sem passar pelo Python a cada imagem.
-    # O caminho precisa coincidir com o usado em ``app/utils/arquivos.py``.
-    PASTA_UPLOADS = BASE_DIR / "app" / "static" / "uploads"
+    # Uploads ficam FORA de ``app/static/``. Tudo em ``static/`` e servido
+    # diretamente pelo servidor web, sem passar por ``@login_required`` nem
+    # por checagem de escopo — a foto de um aluno ficaria acessivel por URL
+    # direta, sem login. Sao imagens de menores de idade.
+    #
+    # Aqui os arquivos so saem por rota autenticada
+    # (ver ``app/utils/arquivos.py::responder_arquivo``).
+    PASTA_UPLOADS = BASE_DIR / "uploads"
     PASTA_BACKUPS = BASE_DIR / "database" / "backups"
     PASTA_LOGS = BASE_DIR / "logs"
 

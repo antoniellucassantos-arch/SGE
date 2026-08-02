@@ -39,7 +39,7 @@
   <div class="card mb-3">
     <div class="card-body d-flex flex-wrap align-items-center gap-3">
       {% if aluno.foto %}
-        <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+        <img src="{{ url_for('alunos.foto', aluno_id=aluno.id) }}"
              alt="Foto de {{ aluno.nome_exibicao }}" class="sge-avatar sge-avatar--lg">
       {% else %}
         <span class="sge-avatar sge-avatar--lg">{{ aluno.iniciais }}</span>

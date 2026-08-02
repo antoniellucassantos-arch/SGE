@@ -38,6 +38,38 @@ ALINHAMENTO_CENTRO = Alignment(horizontal="center", vertical="center")
 # ---------------------------------------------------------------------------
 # Dados dos relatorios
 # ---------------------------------------------------------------------------
+def _turmas_permitidas(turma_id: int | None) -> set[int] | None:
+    """Resolve o conjunto de turmas que o relatorio pode abranger.
+
+    Regra central de escopo dos relatorios:
+
+    - ``turma_id`` informado → apenas ela (o chamador ja validou o acesso);
+    - ``turma_id`` ausente → **todas as turmas do escopo do usuario**, e nao
+      a escola inteira. Antes, ``None`` significava "sem filtro", o que fazia
+      um professor exportar a base completa simplesmente removendo o
+      parametro da URL.
+
+    Returns:
+        ``None`` quando nao ha restricao (perfis administrativos sem filtro).
+    """
+    from flask_login import current_user
+
+    from app.services.turma_service import turmas_no_escopo_do_usuario
+
+    if turma_id is not None:
+        return {turma_id}
+
+    return turmas_no_escopo_do_usuario(current_user)
+
+
+def _filtrar_por_turmas(consulta, coluna_turma, permitidas: set[int] | None):
+    """Aplica o recorte de turmas na propria consulta SQL."""
+    if permitidas is None:
+        return consulta
+    # Conjunto vazio nunca vira "sem filtro": usar {0} garante zero linhas.
+    return consulta.filter(coluna_turma.in_(permitidas or {0}))
+
+
 def relatorio_alunos(
     ano_letivo_id: int | None = None,
     turma_id: int | None = None,
@@ -49,15 +81,19 @@ def relatorio_alunos(
     if situacao:
         consulta = consulta.filter(Aluno.situacao == situacao)
 
-    if turma_id or ano_letivo_id:
-        sub = db.session.query(Matricula.aluno_id).filter(
-            Matricula.situacao == SituacaoMatricula.ATIVA,
-            Matricula.excluido_em.is_(None),
-        )
-        if turma_id:
-            sub = sub.filter(Matricula.turma_id == turma_id)
-        if ano_letivo_id:
-            sub = sub.filter(Matricula.ano_letivo_id == ano_letivo_id)
+    permitidas = _turmas_permitidas(turma_id)
+
+    # O recorte por matricula agora sempre acontece: mesmo sem turma nem ano
+    # informados, o resultado fica limitado ao escopo de quem consulta.
+    sub = db.session.query(Matricula.aluno_id).filter(
+        Matricula.situacao == SituacaoMatricula.ATIVA,
+        Matricula.excluido_em.is_(None),
+    )
+    if ano_letivo_id:
+        sub = sub.filter(Matricula.ano_letivo_id == ano_letivo_id)
+    sub = _filtrar_por_turmas(sub, Matricula.turma_id, permitidas)
+
+    if permitidas is not None or turma_id or ano_letivo_id:
         consulta = consulta.filter(Aluno.id.in_(sub))
 
     alunos = consulta.order_by(Aluno.nome_normalizado).all()
@@ -101,6 +137,8 @@ def relatorio_turmas(ano_letivo_id: int | None = None) -> dict[str, Any]:
     )
     if ano_letivo_id:
         consulta = consulta.filter(Turma.ano_letivo_id == ano_letivo_id)
+
+    consulta = _filtrar_por_turmas(consulta, Turma.id, _turmas_permitidas(None))
 
     turmas = consulta.join(Turma.serie).order_by(Serie.ordem, Turma.nome).all()
 
@@ -183,6 +221,10 @@ def relatorio_matriculas(
     if situacao:
         consulta = consulta.filter(Matricula.situacao == situacao)
 
+    consulta = _filtrar_por_turmas(
+        consulta, Matricula.turma_id, _turmas_permitidas(None)
+    )
+
     matriculas = (
         consulta.join(Aluno, Matricula.aluno_id == Aluno.id)
         .order_by(Aluno.nome_normalizado)
@@ -218,7 +260,11 @@ def relatorio_frequencia(
     ano_letivo_id: int, frequencia_minima: float = 75.0
 ) -> dict[str, Any]:
     """Alunos com frequencia abaixo do minimo legal."""
-    em_risco = frequencia_service.alunos_em_risco(ano_letivo_id, frequencia_minima)
+    em_risco = frequencia_service.alunos_em_risco(
+        ano_letivo_id,
+        frequencia_minima,
+        turmas_permitidas=_turmas_permitidas(None),
+    )
 
     linhas = [
         [
@@ -268,8 +314,10 @@ def relatorio_desempenho(ano_letivo_id: int) -> dict[str, Any]:
         )
         .group_by(Turma.id, Turma.nome, Serie.nome, Serie.ordem)
         .order_by(Serie.ordem, Turma.nome)
-        .all()
     )
+    linhas_banco = _filtrar_por_turmas(
+        linhas_banco, Turma.id, _turmas_permitidas(None)
+    ).all()
 
     linhas = []
     for nome_turma, nome_serie, total, media, frequencia in linhas_banco:

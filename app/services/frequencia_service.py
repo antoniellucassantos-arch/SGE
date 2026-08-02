@@ -452,12 +452,20 @@ def resumo_por_disciplina(matricula_id: int) -> list[dict[str, Any]]:
 
 
 def alunos_em_risco(
-    ano_letivo_id: int, frequencia_minima: float = 75.0
+    ano_letivo_id: int,
+    frequencia_minima: float = 75.0,
+    turmas_permitidas: set[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Alunos abaixo da frequencia minima legal.
 
     Base do alerta preventivo de evasao exibido no painel e no relatorio de
     frequencia.
+
+    Args:
+        turmas_permitidas: quando informado, restringe o resultado a essas
+            turmas. O recorte entra na consulta SQL, e nao apos o carregamento
+            — do contrario os dados das demais turmas ainda seriam lidos e
+            acabariam nas exportacoes.
     """
     linhas = (
         db.session.query(
@@ -484,9 +492,13 @@ def alunos_em_risco(
             Matricula.situacao == SituacaoMatricula.ATIVA,
             Matricula.excluido_em.is_(None),
         )
-        .group_by(Matricula.id)
-        .all()
     )
+
+    if turmas_permitidas is not None:
+        # Conjunto vazio nunca vira "sem filtro".
+        linhas = linhas.filter(Matricula.turma_id.in_(turmas_permitidas or {0}))
+
+    linhas = linhas.group_by(Matricula.id).all()
 
     em_risco: list[dict[str, Any]] = []
     for linha in linhas:

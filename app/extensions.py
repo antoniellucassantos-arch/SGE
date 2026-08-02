@@ -68,6 +68,15 @@ login_manager.needs_refresh_message_category = "warning"
 def carregar_usuario(usuario_id: str):
     """Recupera o usuario da sessao a cada requisicao autenticada.
 
+    Contas inativas ou excluidas sao recusadas **aqui**, e nao apenas no
+    login. Motivo: o Flask-Login consulta ``is_active`` somente em
+    ``login_user()``. Sem esta checagem, quem ja estava autenticado quando a
+    conta foi desativada continuaria navegando ate a sessao expirar — o que
+    torna inutil desligar o acesso de um funcionario demitido.
+
+    Recusar no ``user_loader`` faz o corte valer para **toda** rota, inclusive
+    as protegidas apenas por ``login_required``.
+
     Import local proposital: ``app.models`` depende de ``db``, definido neste
     modulo. Importar no topo criaria um ciclo.
     """
@@ -78,7 +87,12 @@ def carregar_usuario(usuario_id: str):
     except (TypeError, ValueError):
         return None
 
-    return db.session.get(Usuario, chave)
+    usuario = db.session.get(Usuario, chave)
+
+    if usuario is None or not usuario.ativo or usuario.excluido_em is not None:
+        return None
+
+    return usuario
 
 
 @login_manager.unauthorized_handler

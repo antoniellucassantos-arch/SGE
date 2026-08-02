@@ -16,8 +16,7 @@ As defesas aplicadas aqui, em camadas:
 
 from __future__ import annotations
 
-import secrets
-from datetime import datetime
+import uuid
 from pathlib import Path
 
 from flask import current_app
@@ -45,25 +44,24 @@ def extensao_permitida(nome_arquivo: str, permitidas: set[str] | None = None) ->
     return nome_arquivo.rsplit(".", 1)[1].lower() in permitidas
 
 
-def gerar_nome_arquivo(prefixo: str, extensao: str) -> str:
-    """Gera um nome unico e imprevisivel para o arquivo.
+def gerar_nome_arquivo(extensao: str) -> str:
+    """Gera um nome de arquivo opaco, baseado em UUID.
 
-    O componente aleatorio impede que alguem adivinhe a URL da foto de um
-    aluno apenas conhecendo o id dele.
+    O nome nao carrega **nenhuma** informacao sobre o dono: nada de CPF,
+    id ou carimbo de data. Assim, mesmo que uma URL vaze, ela nao revela de
+    quem e o arquivo nem permite enumerar os demais.
     """
-    carimbo = datetime.now().strftime("%Y%m%d%H%M%S")
-    aleatorio = secrets.token_hex(4)
-    prefixo = "".join(c for c in prefixo if c.isalnum() or c in "-_")[:20] or "arq"
-    return f"{prefixo}_{carimbo}_{aleatorio}.{extensao.lower()}"
+    return f"{uuid.uuid4().hex}.{extensao.lower().lstrip('.')}"
 
 
 def _pasta_destino(subpasta: str) -> Path:
-    """Resolve (e cria) a pasta de destino dentro de ``static/uploads``.
+    """Resolve (e cria) a pasta de destino, fora de ``static/``.
 
-    Os arquivos ficam sob ``static/`` para serem servidos diretamente pelo
-    Nginx em producao, sem passar pelo Python a cada requisicao de imagem.
+    Servir uploads por ``static/`` significaria entregar foto de aluno a
+    qualquer pessoa com a URL, sem autenticacao. Aqui os arquivos ficam em
+    ``uploads/`` na raiz do projeto e so saem por rota autenticada.
     """
-    base = Path(current_app.static_folder) / "uploads" / subpasta
+    base = Path(current_app.config["PASTA_UPLOADS"]) / subpasta
     base.mkdir(parents=True, exist_ok=True)
     return base
 
@@ -143,7 +141,7 @@ def salvar_imagem(
                 (largura_maxima, nova_altura), Image.Resampling.LANCZOS
             )
 
-        nome = gerar_nome_arquivo(prefixo, "jpg")
+        nome = gerar_nome_arquivo("jpg")
         caminho = _pasta_destino(subpasta) / nome
         imagem.save(caminho, "JPEG", quality=85, optimize=True)
 
@@ -216,6 +214,38 @@ def remover_arquivo(nome: str | None, subpasta: str) -> bool:
         current_app.logger.warning("Falha ao remover arquivo %s: %s", nome, erro)
 
     return False
+
+
+def responder_arquivo(subpasta: str, nome: str | None):
+    """Entrega um upload ao navegador, validando o caminho resolvido.
+
+    Usada pelas rotas autenticadas de foto. A validacao de **quem** pode ver
+    o arquivo e responsabilidade do decorador de escopo na rota; aqui
+    garantimos apenas que o caminho nao escapa da pasta de uploads.
+
+    Raises:
+        RegistroNaoEncontrado: arquivo ausente ou caminho fora da pasta.
+    """
+    from flask import send_from_directory
+
+    from app.services.excecoes import RegistroNaoEncontrado
+
+    if not nome:
+        raise RegistroNaoEncontrado("Arquivo nao encontrado.")
+
+    pasta = _pasta_destino(subpasta).resolve()
+    caminho = (pasta / nome).resolve()
+
+    # Mesmo com o nome vindo do banco, um valor adulterado nao pode servir
+    # arquivos de fora da pasta (path traversal).
+    if not caminho.is_relative_to(pasta) or not caminho.is_file():
+        raise RegistroNaoEncontrado("Arquivo nao encontrado.")
+
+    resposta = send_from_directory(pasta, caminho.name)
+
+    # Foto de aluno e dado pessoal: nao pode ficar em cache compartilhado.
+    resposta.headers["Cache-Control"] = "private, max-age=300"
+    return resposta
 
 
 def substituir_imagem(

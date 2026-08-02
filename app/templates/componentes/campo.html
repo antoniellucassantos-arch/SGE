@@ -101,14 +101,16 @@
   </div>
 {% endmacro %}
 
-{# --- Upload de arquivo com previa da imagem atual --- #}
-{% macro arquivo(field, ajuda=None, coluna="col-12", atual=None, pasta='usuarios') %}
+{# --- Upload de arquivo com previa da imagem atual ---
+   `url_atual` recebe a URL da rota autenticada (ex.: url_for('alunos.foto',
+   aluno_id=...)). Uploads nao ficam em static/, entao nao ha caminho publico
+   a montar aqui. #}
+{% macro arquivo(field, ajuda=None, coluna="col-12", url_atual=None) %}
   <div class="{{ coluna }}">
     <label for="{{ field.id }}" class="form-label">{{ field.label.text }}</label>
     <div class="d-flex align-items-center gap-3">
-      {% if atual %}
-        <img src="{{ url_for('static', filename='uploads/' ~ pasta ~ '/' ~ atual) }}"
-             alt="Imagem atual" class="sge-avatar sge-avatar--md">
+      {% if url_atual %}
+        <img src="{{ url_atual }}" alt="Imagem atual" class="sge-avatar sge-avatar--md">
       {% endif %}
       <div class="flex-grow-1">
         {{ field(class="form-control" + (" is-invalid" if field.errors else "")) }}

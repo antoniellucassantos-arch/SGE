@@ -175,7 +175,7 @@
         <div class="card-header"><i class="bi bi-image text-primary"></i> Foto</div>
         <div class="card-body text-center">
           {% if aluno and aluno.foto %}
-            <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+            <img src="{{ url_for('alunos.foto', aluno_id=aluno.id) }}"
                  alt="Foto de {{ aluno.nome_exibicao }}"
                  class="sge-avatar sge-avatar--lg mb-3">
           {% else %}

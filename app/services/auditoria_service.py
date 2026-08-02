@@ -76,8 +76,16 @@ def _identificar_usuario() -> tuple[int | None, str | None]:
 def _sanitizar(valor: Any) -> Any:
     """Remove campos sensiveis e trunca valores longos recursivamente."""
     if isinstance(valor, dict):
+        # A chave nem sempre e string: detalhes indexados por id de matricula
+        # chegam como int. Converter antes de comparar evita quebrar a
+        # auditoria com AttributeError justamente no evento que ela deveria
+        # registrar.
         return {
-            chave: ("***" if chave.lower() in CAMPOS_SENSIVEIS else _sanitizar(item))
+            str(chave): (
+                "***"
+                if str(chave).lower() in CAMPOS_SENSIVEIS
+                else _sanitizar(item)
+            )
             for chave, item in valor.items()
         }
     if isinstance(valor, (list, tuple)):

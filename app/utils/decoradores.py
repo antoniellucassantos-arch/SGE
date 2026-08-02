@@ -271,6 +271,44 @@ def exigir_acesso_turma(nome_parametro: str = "turma_id") -> Callable:
     return decorador
 
 
+def exigir_vinculo(nome_parametro: str = "vinculo_id") -> Callable:
+    """Valida se o usuario pode **lancar** no vinculo turma x disciplina.
+
+    Complementa :func:`exigir_acesso_turma`, que autoriza apenas a leitura.
+    Aqui a exigencia e maior: so o professor titular da disciplina (ou a
+    direcao) escreve no diario e nas notas.
+
+        @bp.route("/notas/<int:vinculo_id>", methods=["POST"])
+        @exigir_vinculo()
+        def lancar(vinculo_id):
+            ...
+    """
+
+    def decorador(funcao: Callable) -> Callable:
+        @wraps(funcao)
+        def wrapper(*args, **kwargs):
+            from app.extensions import db
+            from app.models.estrutura import TurmaDisciplina
+
+            vinculo_id = kwargs.get(nome_parametro)
+            vinculo = (
+                db.session.get(TurmaDisciplina, vinculo_id)
+                if vinculo_id is not None
+                else None
+            )
+
+            if not pode_lancar_em_vinculo(vinculo):
+                return _negar_acesso(
+                    f"Escopo de lancamento negado para vinculo {vinculo_id}"
+                )
+
+            return funcao(*args, **kwargs)
+
+        return wrapper
+
+    return decorador
+
+
 def exigir_acesso_aluno(nome_parametro: str = "aluno_id") -> Callable:
     """Valida o escopo de aluno a partir de um parametro da rota."""
 
@@ -298,5 +336,6 @@ __all__ = [
     "pode_lancar_em_vinculo",
     "exigir_acesso_turma",
     "exigir_acesso_aluno",
+    "exigir_vinculo",
     "usuario_tem_permissao",
 ]

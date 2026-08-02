@@ -105,7 +105,7 @@
         <div class="card-header"><i class="bi bi-image text-primary"></i> Foto</div>
         <div class="card-body text-center">
           {% if registro and registro.foto %}
-            <img src="{{ url_for('static', filename='uploads/' ~ ctx.pasta_fotos ~ '/' ~ registro.foto) }}"
+            <img src="{{ url_for(ctx.endpoints.foto, **{ctx.parametro_id: registro.id}) }}"
                  alt="Foto de {{ registro.nome_exibicao }}" class="sge-avatar sge-avatar--lg mb-3">
           {% else %}
             <div class="sge-avatar sge-avatar--lg mx-auto mb-3"><i class="bi bi-person"></i></div>

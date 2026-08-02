@@ -13,7 +13,7 @@ from app.blueprints.responsaveis.formularios import (
 from app.models.pessoas import Responsavel
 from app.services import pessoa_service
 from app.services.excecoes import ErroArquivo, ErroDominio
-from app.utils.arquivos import substituir_imagem
+from app.utils.arquivos import responder_arquivo, substituir_imagem
 from app.utils.decoradores import requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
@@ -48,6 +48,7 @@ CONTEXTO = {
         "detalhe": "responsaveis.detalhe",
         "excluir": "responsaveis.excluir",
         "criar_acesso": "responsaveis.criar_acesso",
+        "foto": "responsaveis.foto",
     },
     "permissoes": {
         "criar": Permissao.RESPONSAVEL_CRIAR,
@@ -206,3 +207,12 @@ def _processar_foto(form: ResponsavelForm, foto_atual: str | None) -> str | None
         quadrada=True,
         largura_maxima=400,
     )
+
+
+@bp.route("/<int:responsavel_id>/foto")
+@login_required
+@requer_permissao(Permissao.RESPONSAVEL_VISUALIZAR)
+def foto(responsavel_id: int):
+    """Entrega a foto do responsavel a quem pode visualizar o cadastro."""
+    responsavel = pessoa_service.responsaveis.buscar(responsavel_id)
+    return responder_arquivo(PASTA_FOTOS, responsavel.foto)

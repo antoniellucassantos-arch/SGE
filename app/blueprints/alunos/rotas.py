@@ -16,7 +16,11 @@ from app.models.estrutura import Turma
 from app.models.pessoas import Aluno, Responsavel
 from app.services import aluno_service
 from app.services.excecoes import ErroArquivo, ErroDominio
-from app.utils.arquivos import remover_arquivo, substituir_imagem
+from app.utils.arquivos import (
+    remover_arquivo,
+    responder_arquivo,
+    substituir_imagem,
+)
 from app.utils.decoradores import exigir_acesso_aluno, requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
@@ -287,3 +291,20 @@ def desvincular_responsavel(aluno_id: int, responsavel_id: int):
         flash("Vinculo removido.", "success")
 
     return redirect(url_for("alunos.detalhe", aluno_id=aluno_id))
+
+
+# ---------------------------------------------------------------------------
+# Foto (servida por rota autenticada, nunca por static/)
+# ---------------------------------------------------------------------------
+@bp.route("/<int:aluno_id>/foto")
+@login_required
+@exigir_acesso_aluno()
+def foto(aluno_id: int):
+    """Entrega a foto do aluno apenas a quem tem escopo sobre ele.
+
+    Uploads ficam fora de ``static/`` justamente para passarem por aqui:
+    sao imagens de menores de idade e nao podem ser acessiveis por URL
+    direta, sem login.
+    """
+    aluno = aluno_service.buscar(aluno_id)
+    return responder_arquivo(PASTA_FOTOS, aluno.foto)

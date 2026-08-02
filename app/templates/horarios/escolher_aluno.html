@@ -15,7 +15,7 @@
          class="card h-100 text-reset text-decoration-none">
         <div class="card-body d-flex align-items-center gap-3">
           {% if aluno.foto %}
-            <img src="{{ url_for('static', filename='uploads/alunos/' ~ aluno.foto) }}"
+            <img src="{{ url_for('alunos.foto', aluno_id=aluno.id) }}"
                  alt="" class="sge-avatar sge-avatar--md">
           {% else %}
             <span class="sge-avatar sge-avatar--md">{{ aluno.iniciais }}</span>

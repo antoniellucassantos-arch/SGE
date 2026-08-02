@@ -93,7 +93,7 @@
                     <a href="{{ url_for(ctx.endpoints.detalhe, **{ctx.parametro_id: registro.id}) }}"
                        class="d-flex align-items-center gap-2 text-reset text-decoration-none">
                       {% if registro.foto %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ ctx.pasta_fotos ~ '/' ~ registro.foto) }}"
+                        <img src="{{ url_for(ctx.endpoints.foto, **{ctx.parametro_id: registro.id}) }}"
                              alt="" class="sge-avatar sge-avatar--sm">
                       {% else %}
                         <span class="sge-avatar sge-avatar--sm">{{ registro.iniciais }}</span>
