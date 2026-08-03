@@ -60,6 +60,20 @@ BLUEPRINTS: tuple[tuple[str, str, str | None], ...] = (
 BLUEPRINTS_ATIVOS: set[str] = {caminho for caminho, _, _ in BLUEPRINTS}
 
 
+def prefere_json() -> bool:
+    """Decide se o cliente espera JSON em vez de HTML.
+
+    Vive no nivel do modulo — e nao dentro do registrador de handlers —
+    porque tanto os handlers de erro quanto o ``before_request`` precisam da
+    mesma decisao. Duas copias dessa regra divergiriam na primeira mudanca.
+    """
+    return (
+        request.path.startswith("/api/")
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.accept_mimetypes.best == "application/json"
+    )
+
+
 def create_app(nome_configuracao: str | None = None) -> Flask:
     """Cria e configura uma instancia da aplicacao SGE."""
     app = Flask(
@@ -213,12 +227,7 @@ def _registrar_handlers_erro(app: Flask) -> None:
     """Paginas de erro amigaveis; nunca expor rastro de pilha ao usuario."""
     from app.services.excecoes import ErroDominio
 
-    def _quer_json() -> bool:
-        return (
-            request.path.startswith("/api/")
-            or request.headers.get("X-Requested-With") == "XMLHttpRequest"
-            or request.accept_mimetypes.best == "application/json"
-        )
+    _quer_json = prefere_json
 
     @app.errorhandler(400)
     def erro_400(erro):
@@ -265,6 +274,16 @@ def _registrar_handlers_erro(app: Flask) -> None:
     def erro_dominio(erro: ErroDominio):
         """Converte excecoes de negocio em resposta adequada ao cliente."""
         app.logger.info("Erro de dominio: %s", erro.mensagem)
+
+        # Um `ErroPermissao` vindo do service e um acesso negado como
+        # qualquer outro. Os decoradores ja registravam o evento; quem
+        # levanta a excecao no meio do fluxo, nao — e e justamente o caso
+        # das validacoes de escopo por querystring, o vetor mais provavel de
+        # tentativa de leitura de dados alheios.
+        if erro.codigo_http == 403:
+            from app.services.auditoria_service import registrar_acesso_negado
+
+            registrar_acesso_negado(erro.mensagem)
 
         if _quer_json():
             return {"erro": erro.mensagem}, erro.codigo_http
@@ -339,6 +358,21 @@ def _registrar_hooks(app: Flask) -> None:
 
         # Troca de senha obrigatoria (primeiro acesso ou reset administrativo).
         if current_user.deve_trocar_senha and request.endpoint not in ROTAS_LIVRES:
+            if prefere_json():
+                # Um cliente JSON — o JavaScript da tela, amanha o aplicativo
+                # Android — nao tem o que fazer com um 302 para uma pagina
+                # HTML: ele so enxerga uma resposta de sucesso com conteudo
+                # incompreensivel. O status precisa dizer o que houve.
+                return (
+                    {
+                        "sucesso": False,
+                        "erro": (
+                            "Defina uma nova senha antes de usar o sistema."
+                        ),
+                    },
+                    403,
+                )
+
             if not request.path.startswith("/static"):
                 flash(
                     "Por seguranca, defina uma nova senha antes de continuar.",
@@ -412,6 +446,13 @@ def _carregar_ano_letivo_corrente():
             .first()
         )
     except Exception:  # noqa: BLE001 - banco ainda nao migrado
+        # O `rollback` nao e cosmetico. O `except` acima foi escrito para o
+        # caso "tabela ainda nao existe", mas ele tambem pega timeout,
+        # deadlock e coluna removida. No PostgreSQL, uma consulta que falha
+        # deixa a transacao abortada: sem desfaze-la aqui, *toda* consulta
+        # seguinte da requisicao morre com InFailedSqlTransaction — e a
+        # causa aparente fica sendo a proxima query, nao esta.
+        db.session.rollback()
         return None
 
 
@@ -472,8 +513,15 @@ def _configurar_jinja(app: Flask) -> None:
         from app.models.sistema import ConfiguracaoEscola
 
         try:
-            escola = ConfiguracaoEscola.obter()
+            # Copia em cache: este bloco roda a cada renderizacao de
+            # template e os dados institucionais mudam uma vez por semestre.
+            escola = ConfiguracaoEscola.obter_para_leitura()
         except Exception:  # noqa: BLE001 - banco ainda nao migrado
+            # Mesma armadilha de `_carregar_ano_letivo_corrente`: sem o
+            # rollback a transacao fica abortada e derruba o restante da
+            # requisicao. Aqui e ainda mais silencioso, porque o
+            # context_processor roda durante a renderizacao do template.
+            db.session.rollback()
             escola = None
 
         return {

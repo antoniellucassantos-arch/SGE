@@ -14,6 +14,7 @@ registro explicito de presenca nao ha como distinguir "aluno presente" de
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Any
 
@@ -414,8 +415,18 @@ def apurar_frequencia(
         consulta = consulta.filter(Aula.turma_disciplina_id == turma_disciplina_id)
 
     linha = consulta.one()
-    total = int(linha.total or 0)
-    faltas = int(linha.faltas or 0)
+    return _montar_apuracao(linha.total, linha.faltas)
+
+
+def _montar_apuracao(total, faltas) -> dict[str, Any]:
+    """Formata o resultado da contagem de aulas e faltas.
+
+    Definicao unica do que e "percentual de frequencia": a apuracao
+    individual e a em lote precisam produzir exatamente o mesmo numero, sob
+    pena de o boletim discordar do fechamento da turma.
+    """
+    total = int(total or 0)
+    faltas = int(faltas or 0)
     presencas = max(0, total - faltas)
 
     return {
@@ -424,6 +435,70 @@ def apurar_frequencia(
         "total_presencas": presencas,
         "percentual": round(presencas / total * 100, 2) if total else None,
     }
+
+
+def apurar_frequencia_em_lote(
+    matricula_ids: Sequence[int],
+) -> dict[tuple[int, int | None], dict[str, Any]]:
+    """Frequencia de varios alunos, em uma unica consulta.
+
+    Chave do dicionario: ``(matricula_id, turma_disciplina_id)`` para a
+    apuracao por disciplina e ``(matricula_id, None)`` para o total geral do
+    aluno.
+
+    Existe por causa do fechamento de periodo: apurando aluno a aluno,
+    disciplina a disciplina, uma turma de 40 alunos com 12 disciplinas
+    dispara quase 500 consultas. Aqui sai uma so, e o total geral e obtido
+    somando as parciais em memoria — nao vale uma segunda ida ao banco.
+    """
+    identificadores = list(matricula_ids)
+    if not identificadores:
+        return {}
+
+    linhas = (
+        db.session.query(
+            Frequencia.matricula_id.label("matricula_id"),
+            Aula.turma_disciplina_id.label("vinculo_id"),
+            func.coalesce(func.sum(Aula.quantidade_aulas), 0).label("total"),
+            func.coalesce(
+                func.sum(
+                    db.case(
+                        (
+                            Frequencia.situacao == SituacaoPresenca.FALTA,
+                            Aula.quantidade_aulas,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("faltas"),
+        )
+        .select_from(Frequencia)
+        .join(Aula, Frequencia.aula_id == Aula.id)
+        .filter(Frequencia.matricula_id.in_(identificadores))
+        .group_by(Frequencia.matricula_id, Aula.turma_disciplina_id)
+        .all()
+    )
+
+    apuracoes: dict[tuple[int, int | None], dict[str, Any]] = {}
+    totais_gerais: dict[int, list[int]] = {}
+
+    for linha in linhas:
+        apuracoes[(linha.matricula_id, linha.vinculo_id)] = _montar_apuracao(
+            linha.total, linha.faltas
+        )
+
+        acumulado = totais_gerais.setdefault(linha.matricula_id, [0, 0])
+        acumulado[0] += int(linha.total or 0)
+        acumulado[1] += int(linha.faltas or 0)
+
+    # Alunos sem nenhuma aula registrada precisam aparecer com zero, e nao
+    # sumir do dicionario: quem consulta espera uma apuracao para todos.
+    for matricula_id in identificadores:
+        total, faltas = totais_gerais.get(matricula_id, (0, 0))
+        apuracoes[(matricula_id, None)] = _montar_apuracao(total, faltas)
+
+    return apuracoes
 
 
 def resumo_por_disciplina(matricula_id: int) -> list[dict[str, Any]]:

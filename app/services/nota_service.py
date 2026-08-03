@@ -26,6 +26,7 @@ historico ja apurado.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -541,31 +542,159 @@ def _converter_nota(texto: str | None) -> Decimal | None:
 
 
 # ---------------------------------------------------------------------------
+# Carregamento em lote
+# ---------------------------------------------------------------------------
+class LoteConsolidacao:
+    """Dados de uma turma inteira, carregados de uma vez so.
+
+    Motivo de existir: a consolidacao de fechamento de periodo percorre
+    ``aluno x disciplina x periodo``. Consultando sob demanda, uma turma de
+    40 alunos com 12 disciplinas e 4 bimestres passa de duas mil idas ao
+    banco — e cada uma delas devolve pouquissimas linhas. Com o lote sao
+    quatro consultas, independentemente do tamanho da turma.
+
+    O lote e **opcional** em toda a cadeia de calculo: quando ausente, cada
+    funcao consulta o banco como sempre fez. Isso mantem barato o caminho de
+    uma nota so (abrir o boletim de um aluno) e evita que a otimizacao do
+    fechamento contamine o resto do servico.
+
+    Nao guarda nada entre requisicoes: e construido, usado e descartado
+    dentro da mesma operacao. Cache de longa duracao sobre nota seria uma
+    forma criativa de exibir boletim desatualizado.
+    """
+
+    def __init__(self, matricula_ids: Sequence[int]) -> None:
+        self.matricula_ids = list(matricula_ids)
+        self._notas: dict[tuple[int, int], list[tuple[Nota, Avaliacao]]] = {}
+        self._frequencia: dict[tuple[int, int | None], dict[str, Any]] = {}
+        self._resultados: dict[tuple[int, int], ResultadoDisciplina] = {}
+        self._periodos: dict[int, list[PeriodoLetivo]] = {}
+        self._vinculos: dict[int, list[TurmaDisciplina]] = {}
+        self._carregar()
+
+    # -- Construcao --------------------------------------------------------
+    def _carregar(self) -> None:
+        if not self.matricula_ids:
+            return
+
+        linhas = (
+            db.session.query(Nota, Avaliacao)
+            .join(Avaliacao, Nota.avaliacao_id == Avaliacao.id)
+            .filter(Nota.matricula_id.in_(self.matricula_ids))
+            .all()
+        )
+        for nota, avaliacao in linhas:
+            chave = (nota.matricula_id, avaliacao.turma_disciplina_id)
+            self._notas.setdefault(chave, []).append((nota, avaliacao))
+
+        self._frequencia = frequencia_service.apurar_frequencia_em_lote(
+            self.matricula_ids
+        )
+
+        for resultado in (
+            db.session.query(ResultadoDisciplina)
+            .filter(ResultadoDisciplina.matricula_id.in_(self.matricula_ids))
+            .all()
+        ):
+            self._resultados[
+                (resultado.matricula_id, resultado.turma_disciplina_id)
+            ] = resultado
+
+    # -- Consulta ----------------------------------------------------------
+    def notas(self, matricula_id: int, vinculo_id: int):
+        return self._notas.get((matricula_id, vinculo_id), [])
+
+    def frequencia(
+        self, matricula_id: int, vinculo_id: int | None = None
+    ) -> dict[str, Any]:
+        apuracao = self._frequencia.get((matricula_id, vinculo_id))
+        if apuracao is None:
+            return frequencia_service.apurar_frequencia_em_lote([matricula_id]).get(
+                (matricula_id, vinculo_id),
+                {
+                    "total_aulas": 0,
+                    "total_faltas": 0,
+                    "total_presencas": 0,
+                    "percentual": None,
+                },
+            )
+        return apuracao
+
+    def resultado(self, matricula_id: int, vinculo_id: int):
+        return self._resultados.get((matricula_id, vinculo_id))
+
+    def registrar_resultado(self, resultado: ResultadoDisciplina) -> None:
+        """Guarda um resultado recem-criado para nao recarrega-lo depois."""
+        self._resultados[
+            (resultado.matricula_id, resultado.turma_disciplina_id)
+        ] = resultado
+
+    def periodos(self, ano_letivo_id: int) -> list[PeriodoLetivo]:
+        """Memoriza os periodos: sao os mesmos para a turma inteira."""
+        if ano_letivo_id not in self._periodos:
+            self._periodos[ano_letivo_id] = periodos_do_ano(ano_letivo_id)
+        return self._periodos[ano_letivo_id]
+
+    def vinculos(self, turma_id: int) -> list[TurmaDisciplina]:
+        """Memoriza as disciplinas: idem, iguais para todos os alunos."""
+        if turma_id not in self._vinculos:
+            self._vinculos[turma_id] = (
+                db.session.query(TurmaDisciplina)
+                .filter(
+                    TurmaDisciplina.turma_id == turma_id,
+                    TurmaDisciplina.ativa.is_(True),
+                )
+                .all()
+            )
+        return self._vinculos[turma_id]
+
+
+def _notas_do_vinculo(
+    matricula_id: int, vinculo_id: int, lote: LoteConsolidacao | None = None
+) -> list[tuple[Nota, Avaliacao]]:
+    """Todas as ``(Nota, Avaliacao)`` do aluno em uma disciplina.
+
+    Ponto unico de acesso: com lote, le da memoria; sem lote, consulta o
+    banco. Os filtros por periodo e por tipo de avaliacao ficam em Python,
+    nos chamadores — assim existe **uma** forma da consulta, e nao duas que
+    precisam ser mantidas identicas.
+    """
+    if lote is not None:
+        return lote.notas(matricula_id, vinculo_id)
+
+    return (
+        db.session.query(Nota, Avaliacao)
+        .join(Avaliacao, Nota.avaliacao_id == Avaliacao.id)
+        .filter(
+            Nota.matricula_id == matricula_id,
+            Avaliacao.turma_disciplina_id == vinculo_id,
+        )
+        .all()
+    )
+
+
+# ---------------------------------------------------------------------------
 # Calculo de medias
 # ---------------------------------------------------------------------------
 def calcular_media_periodo(
-    matricula_id: int, vinculo_id: int, periodo_id: int
+    matricula_id: int,
+    vinculo_id: int,
+    periodo_id: int,
+    lote: LoteConsolidacao | None = None,
 ) -> Decimal | None:
     """Media ponderada do aluno em um periodo.
 
     Retorna ``None`` quando nenhuma nota foi lancada — diferente de zero,
     que significa desempenho nulo.
     """
-    linhas = (
-        db.session.query(Nota, Avaliacao)
-        .join(Avaliacao, Nota.avaliacao_id == Avaliacao.id)
-        .filter(
-            Nota.matricula_id == matricula_id,
-            Avaliacao.turma_disciplina_id == vinculo_id,
-            Avaliacao.periodo_id == periodo_id,
-            # Nenhuma recuperacao entra na media ponderada: elas substituem
-            # o resultado, e nao compoem com ele.
-            Avaliacao.tipo.notin_(
-                [TipoAvaliacao.RECUPERACAO, TipoAvaliacao.RECUPERACAO_FINAL]
-            ),
-        )
-        .all()
-    )
+    linhas = [
+        (nota, avaliacao)
+        for nota, avaliacao in _notas_do_vinculo(matricula_id, vinculo_id, lote)
+        if avaliacao.periodo_id == periodo_id
+        # Nenhuma recuperacao entra na media ponderada: elas substituem o
+        # resultado, e nao compoem com ele.
+        and not avaliacao.tipo.e_recuperacao
+    ]
 
     soma_pesos = Decimal("0")
     soma_valores = Decimal("0")
@@ -590,7 +719,7 @@ def calcular_media_periodo(
     media = soma_valores / soma_pesos
 
     # A recuperacao do periodo substitui a media quando for maior.
-    recuperacao = _nota_recuperacao(matricula_id, vinculo_id, periodo_id)
+    recuperacao = _nota_recuperacao(matricula_id, vinculo_id, periodo_id, lote)
     if recuperacao is not None and recuperacao > media:
         media = recuperacao
 
@@ -616,7 +745,10 @@ def _normalizar(valor: Decimal | None, avaliacao: Avaliacao) -> Decimal | None:
 
 
 def _nota_recuperacao(
-    matricula_id: int, vinculo_id: int, periodo_id: int | None = None
+    matricula_id: int,
+    vinculo_id: int,
+    periodo_id: int | None = None,
+    lote: LoteConsolidacao | None = None,
 ) -> Decimal | None:
     """Maior nota de recuperacao, normalizada para a escala 0-10.
 
@@ -635,23 +767,18 @@ def _nota_recuperacao(
         TipoAvaliacao.RECUPERACAO if periodo_id else TipoAvaliacao.RECUPERACAO_FINAL
     )
 
-    consulta = (
-        db.session.query(Nota, Avaliacao)
-        .join(Avaliacao, Nota.avaliacao_id == Avaliacao.id)
-        .filter(
-            Nota.matricula_id == matricula_id,
-            Avaliacao.turma_disciplina_id == vinculo_id,
-            Avaliacao.tipo == tipo,
-            Nota.valor.isnot(None),
-        )
-    )
-    if periodo_id:
-        consulta = consulta.filter(Avaliacao.periodo_id == periodo_id)
+    candidatas = [
+        (nota, avaliacao)
+        for nota, avaliacao in _notas_do_vinculo(matricula_id, vinculo_id, lote)
+        if avaliacao.tipo is tipo
+        and nota.valor is not None
+        and (periodo_id is None or avaliacao.periodo_id == periodo_id)
+    ]
 
     # O maximo e calculado apos a normalizacao: comparar valores em escalas
     # diferentes no SQL (`func.max`) daria o resultado errado.
     normalizadas = [
-        _normalizar(nota.valor, avaliacao) for nota, avaliacao in consulta.all()
+        _normalizar(nota.valor, avaliacao) for nota, avaliacao in candidatas
     ]
     validas = [valor for valor in normalizadas if valor is not None]
 
@@ -659,37 +786,56 @@ def _nota_recuperacao(
 
 
 def calcular_resultado_disciplina(
-    matricula: Matricula, vinculo: TurmaDisciplina
+    matricula: Matricula,
+    vinculo: TurmaDisciplina,
+    lote: LoteConsolidacao | None = None,
+    confirmar: bool = True,
 ) -> ResultadoDisciplina:
     """Consolida medias, frequencia e resultado de um aluno na disciplina.
 
     O resultado e persistido em ``ResultadoDisciplina`` para que o boletim
     nao precise recalcular tudo a cada abertura de tela, e para congelar a
     apuracao feita segundo as regras vigentes no ano.
+
+    Args:
+        lote: dados da turma pre-carregados (ver :class:`LoteConsolidacao`).
+        confirmar: quando ``False``, deixa a transacao aberta para quem
+            chamou fechar. Usado no fechamento de periodo, onde um commit
+            por aluno por disciplina custaria centenas de fsync.
     """
     ano_letivo = matricula.ano_letivo
-    periodos = periodos_do_ano(matricula.ano_letivo_id)
+    periodos = (
+        lote.periodos(matricula.ano_letivo_id)
+        if lote is not None
+        else periodos_do_ano(matricula.ano_letivo_id)
+    )
 
     resultado = (
-        db.session.query(ResultadoDisciplina)
-        .filter(
-            ResultadoDisciplina.matricula_id == matricula.id,
-            ResultadoDisciplina.turma_disciplina_id == vinculo.id,
+        lote.resultado(matricula.id, vinculo.id)
+        if lote is not None
+        else (
+            db.session.query(ResultadoDisciplina)
+            .filter(
+                ResultadoDisciplina.matricula_id == matricula.id,
+                ResultadoDisciplina.turma_disciplina_id == vinculo.id,
+            )
+            .first()
         )
-        .first()
     )
     if resultado is None:
         resultado = ResultadoDisciplina(
             matricula_id=matricula.id, turma_disciplina_id=vinculo.id
         )
         db.session.add(resultado)
+        if lote is not None:
+            lote.registrar_resultado(resultado)
 
     # --- Medias por periodo ---
     # Percorre TODOS os periodos do ano. O antigo `periodos[:4]` descartava
     # o quinto em silencio, produzindo media anual errada sem aviso nenhum.
     medias: list[Decimal] = []
     for periodo in periodos:
-        media = calcular_media_periodo(matricula.id, vinculo.id, periodo.id)
+        media = calcular_media_periodo(matricula.id, vinculo.id, periodo.id, lote)
         resultado.definir_media_periodo(periodo.ordem, media)
         if media is not None:
             medias.append(media)
@@ -701,7 +847,9 @@ def calcular_resultado_disciplina(
     # --- Recuperacao final ---
     # Sem `periodo_id`, `_nota_recuperacao` busca apenas RECUPERACAO_FINAL:
     # a recuperacao de bimestre ja foi aplicada na media daquele periodo.
-    resultado.nota_recuperacao = _nota_recuperacao(matricula.id, vinculo.id)
+    resultado.nota_recuperacao = _nota_recuperacao(
+        matricula.id, vinculo.id, lote=lote
+    )
 
     media_final = resultado.media_anual
     if resultado.nota_recuperacao is not None and (
@@ -711,7 +859,11 @@ def calcular_resultado_disciplina(
     resultado.media_final = media_final
 
     # --- Frequencia ---
-    apuracao = frequencia_service.apurar_frequencia(matricula.id, vinculo.id)
+    apuracao = (
+        lote.frequencia(matricula.id, vinculo.id)
+        if lote is not None
+        else frequencia_service.apurar_frequencia(matricula.id, vinculo.id)
+    )
     resultado.total_aulas = apuracao["total_aulas"]
     resultado.total_faltas = apuracao["total_faltas"]
     resultado.percentual_frequencia = (
@@ -728,7 +880,8 @@ def calcular_resultado_disciplina(
         periodos_lancados=len(medias),
     )
 
-    _confirmar("Falha ao consolidar resultado")
+    if confirmar:
+        _confirmar("Falha ao consolidar resultado")
     return resultado
 
 
@@ -788,19 +941,28 @@ def _apurar_resultado(
     return ResultadoFinal.REPROVADO
 
 
-def consolidar_matricula(matricula: Matricula) -> list[ResultadoDisciplina]:
+def consolidar_matricula(
+    matricula: Matricula,
+    lote: LoteConsolidacao | None = None,
+    confirmar: bool = True,
+) -> list[ResultadoDisciplina]:
     """Recalcula o resultado do aluno em todas as disciplinas da turma."""
     vinculos = (
-        db.session.query(TurmaDisciplina)
-        .filter(
-            TurmaDisciplina.turma_id == matricula.turma_id,
-            TurmaDisciplina.ativa.is_(True),
+        lote.vinculos(matricula.turma_id)
+        if lote is not None
+        else (
+            db.session.query(TurmaDisciplina)
+            .filter(
+                TurmaDisciplina.turma_id == matricula.turma_id,
+                TurmaDisciplina.ativa.is_(True),
+            )
+            .all()
         )
-        .all()
     )
 
     resultados = [
-        calcular_resultado_disciplina(matricula, vinculo) for vinculo in vinculos
+        calcular_resultado_disciplina(matricula, vinculo, lote, confirmar=False)
+        for vinculo in vinculos
     ]
 
     # Atualiza a consolidacao anual da propria matricula.
@@ -811,7 +973,11 @@ def consolidar_matricula(matricula: Matricula) -> list[ResultadoDisciplina]:
         _arredondar(sum(medias) / len(medias)) if medias else None
     )
 
-    apuracao_geral = frequencia_service.apurar_frequencia(matricula.id)
+    apuracao_geral = (
+        lote.frequencia(matricula.id)
+        if lote is not None
+        else frequencia_service.apurar_frequencia(matricula.id)
+    )
     matricula.total_faltas = apuracao_geral["total_faltas"]
     matricula.percentual_frequencia = (
         _arredondar(apuracao_geral["percentual"])
@@ -819,7 +985,8 @@ def consolidar_matricula(matricula: Matricula) -> list[ResultadoDisciplina]:
         else None
     )
 
-    _confirmar("Falha ao consolidar matricula")
+    if confirmar:
+        _confirmar("Falha ao consolidar matricula")
     return resultados
 
 
@@ -828,15 +995,27 @@ def consolidar_turma(turma: Turma, incluir_inativas: bool = False) -> int:
 
     Operacao pesada, executada sob demanda no fechamento de periodo.
 
+    Carrega os dados da turma inteira de uma vez e grava tudo em **um**
+    commit. Antes, cada aluno em cada disciplina disparava um commit e
+    dezenas de consultas: uma turma de 40 alunos com 12 disciplinas passava
+    de 480 transacoes, e a secretaria assistia a barra de progresso por
+    minutos. O commit unico tambem torna a operacao atomica — ou a turma
+    inteira fecha, ou nada muda, sem deixar metade dos boletins consolidados
+    com regras diferentes da outra metade.
+
     Args:
         incluir_inativas: alcanca tambem transferidos e trancados. Necessario
             no fechamento do ano, quando o historico de quem saiu no meio do
             periodo tambem precisa ficar consolidado.
     """
-    total = 0
-    for matricula in matriculas_da_turma(turma.id, incluir_inativas):
-        consolidar_matricula(matricula)
-        total += 1
+    matriculas = matriculas_da_turma(turma.id, incluir_inativas)
+    lote = LoteConsolidacao([matricula.id for matricula in matriculas])
+
+    for matricula in matriculas:
+        consolidar_matricula(matricula, lote, confirmar=False)
+
+    total = len(matriculas)
+    _confirmar("Falha ao consolidar a turma")
 
     auditoria_service.registrar(
         auditoria_service.AcaoAuditoria.ATUALIZACAO,

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Any
 
+from flask import current_app, has_app_context
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -13,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    event,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -22,6 +25,29 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
 from app.models.base import ModeloBase, TimestampMixin, agora_utc
 from app.models.enums import AcaoAuditoria
+
+#: Validade do cache dos dados institucionais.
+#:
+#: Existe **alem** da invalidacao explicita porque em producao a aplicacao
+#: roda em varios processos: quando a secretaria salva no worker A, o worker
+#: B so descobre pelo vencimento. Cinco minutos de defasagem no cabecalho de
+#: um documento e aceitavel; meia hora nao.
+SEGUNDOS_CACHE_ESCOLA = 300
+
+
+def _cache_escola() -> dict[str, Any]:
+    """Cache guardado na instancia da aplicacao, nao em variavel de modulo.
+
+    Cada processo tem a sua — que e o comportamento desejado em producao — e
+    cada teste tambem, o que impede que o banco de um vaze no outro.
+    """
+    return current_app.extensions.setdefault("sge_cache_escola", {})
+
+
+def limpar_cache_escola() -> None:
+    """Descarta o cache. Chamado sempre que a configuracao e gravada."""
+    if has_app_context():
+        _cache_escola().clear()
 
 
 class ConfiguracaoEscola(ModeloBase, TimestampMixin):
@@ -97,13 +123,52 @@ class ConfiguracaoEscola(ModeloBase, TimestampMixin):
     # ------------------------------------------------------------------
     @classmethod
     def obter(cls) -> ConfiguracaoEscola:
-        """Retorna a configuracao unica, criando-a na primeira execucao."""
+        """Retorna a configuracao unica, criando-a na primeira execucao.
+
+        Sempre ligada a sessao corrente: e a versao que os fluxos de
+        **escrita** usam. Para leitura repetida, prefira
+        :meth:`obter_para_leitura`.
+        """
         config = db.session.get(cls, 1)
         if config is None:
             config = cls(id=1, nome="Escola")
             db.session.add(config)
             db.session.commit()
         return config
+
+    @classmethod
+    def obter_para_leitura(cls) -> ConfiguracaoEscola:
+        """Copia **somente leitura** dos dados institucionais, vinda de cache.
+
+        Por que existe: o ``context_processor`` que injeta ``escola`` nos
+        templates roda a cada renderizacao, e a sessao e descartada ao fim de
+        cada requisicao. Sem cache, o cabecalho da escola — que muda uma vez
+        por semestre — ia ao banco em toda tela aberta por toda a escola, o
+        dia inteiro.
+
+        Por que uma copia solta, e nao a instancia da sessao: guardar um
+        objeto do ORM entre requisicoes o deixa preso a uma sessao ja
+        encerrada, e qualquer atributo ainda nao carregado explodiria com
+        ``DetachedInstanceError`` no meio da renderizacao. A copia devolvida
+        aqui nao pertence a sessao nenhuma e nao pode ser salva por engano.
+        """
+        cache = _cache_escola()
+        agora = agora_utc()
+
+        if cache.get("dados") is None or cache.get("expira_em", agora) <= agora:
+            config = cls.obter()
+            cache["dados"] = {
+                coluna.name: getattr(config, coluna.name)
+                for coluna in cls.__table__.columns
+            }
+            cache["expira_em"] = agora + timedelta(
+                seconds=SEGUNDOS_CACHE_ESCOLA
+            )
+
+        copia = cls()
+        for campo, valor in cache["dados"].items():
+            setattr(copia, campo, valor)
+        return copia
 
     @property
     def endereco_completo(self) -> str:
@@ -124,6 +189,35 @@ class ConfiguracaoEscola(ModeloBase, TimestampMixin):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<ConfiguracaoEscola {self.nome}>"
+
+
+# ---------------------------------------------------------------------------
+# Invalidacao automatica do cache
+# ---------------------------------------------------------------------------
+# A invalidacao e feita por evento da sessao, e nao por chamada explicita em
+# cada service, porque depender de disciplina do chamador e como o cache
+# apodrece: basta um caminho de escrita novo esquecer a linha para a escola
+# ficar com o nome antigo no boletim, sem ninguem entender por que.
+#
+# Dois eventos, e nao um: no `after_commit` os objetos ja estao expirados e
+# nao da para saber o que mudou; no `after_flush` da, mas a transacao ainda
+# pode sofrer rollback. Entao o flush marca e o commit executa.
+_MARCA_ALTERACAO = "configuracao_escola_alterada"
+
+
+@event.listens_for(db.session, "after_flush")
+def _marcar_configuracao_alterada(sessao, _contexto) -> None:
+    if any(
+        isinstance(objeto, ConfiguracaoEscola)
+        for objeto in (*sessao.new, *sessao.dirty, *sessao.deleted)
+    ):
+        sessao.info[_MARCA_ALTERACAO] = True
+
+
+@event.listens_for(db.session, "after_commit")
+def _invalidar_cache_apos_commit(sessao) -> None:
+    if sessao.info.pop(_MARCA_ALTERACAO, False):
+        limpar_cache_escola()
 
 
 class LogAuditoria(ModeloBase):
