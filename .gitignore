@@ -60,6 +60,13 @@ htmlcov/
 .ruff_cache/
 .mypy_cache/
 
+# Claude Code
+# `.claude/settings.json`, `agents/`, `commands/` e `hooks/` SAO versionados:
+# sao a configuracao de trabalho da equipe. Ficam de fora apenas os arquivos
+# especificos de uma maquina.
+.claude/settings.local.json
+.claude/launch.json
+
 # IDEs / editores
 .vscode/
 .idea/

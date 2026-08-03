@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest*)",
+      "Bash(python -m ruff*)",
+      "Bash(./venv/Scripts/python.exe -m pytest*)",
+      "Bash(./venv/Scripts/python.exe -m ruff*)",
+      "Bash(./venv/bin/python -m pytest*)",
+      "Bash(./venv/bin/python -m ruff*)",
+      "Bash(flask db*)",
+      "Bash(flask verificar-saude*)",
+      "Bash(flask listar-usuarios*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ],
+    "deny": [
+      "Read(./instance/**)",
+      "Read(./uploads/**)",
+      "Read(./backups/**)",
+      "Read(./.env)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/formatar.py",
+            "timeout": 60,
+            "statusMessage": "Formatando com ruff"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/testar.py",
+            "timeout": 320,
+            "statusMessage": "Rodando a suite de testes"
+          }
+        ]
+      }
+    ]
+  }
+}

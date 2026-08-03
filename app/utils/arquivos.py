@@ -90,7 +90,8 @@ def salvar_imagem(
 
     Args:
         arquivo: Campo de upload do formulario.
-        subpasta: Pasta sob ``static/uploads`` (``alunos``, ``escola``...).
+        subpasta: Pasta sob ``PASTA_UPLOADS`` (``alunos``, ``escola``...),
+            que fica na raiz do projeto — nunca dentro de ``static/``.
         prefixo: Prefixo legivel do nome final.
         largura_maxima: Redimensiona proporcionalmente se exceder.
         quadrada: Recorta ao centro em proporcao 1:1 (fotos de perfil).

@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# SGE - Sistema de Gestao Escolar
+#
+# PostgreSQL local, para desenvolver contra o mesmo banco da producao.
+#
+# O desenvolvimento roda em SQLite, e isso e conveniente — mas os dois bancos
+# discordam em coisas que so aparecem no deploy: SQLite aceita `ALTER` que o
+# Postgres recusa, ignora tipo em coluna, e nao tem `InFailedSqlTransaction`.
+# Descobrir isso no dia da entrega para a escola e caro.
+#
+#     docker compose up -d
+#     export DATABASE_URL=postgresql+psycopg://sge:sge@localhost:5433/sge
+#     flask db upgrade
+#     flask criar-estrutura-inicial
+#
+# Para voltar ao SQLite, basta remover a variavel DATABASE_URL.
+#
+# Porta 5433 de proposito: 5432 costuma estar ocupada por um Postgres
+# instalado na maquina, e o erro de porta em uso e confuso de diagnosticar.
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sge
+      POSTGRES_USER: sge
+      # Credencial de desenvolvimento local. Em producao a senha vem de
+      # variavel de ambiente e o banco nao fica exposto na internet.
+      POSTGRES_PASSWORD: sge
+      # Locale pt-BR: ordenacao de nome com acento sai correta, que e o que
+      # a listagem de alunos usa o tempo todo.
+      LANG: pt_BR.utf8
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dados:/var/lib/postgresql/data
+    healthcheck:
+      # `flask db upgrade` logo apos o `up` falha se o banco ainda estiver
+      # inicializando. O healthcheck permite `docker compose up --wait`.
+      test: ["CMD-SHELL", "pg_isready -U sge -d sge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Interface web para inspecionar o banco. Opcional — sobe apenas com
+  # `docker compose --profile ferramentas up -d`.
+  adminer:
+    image: adminer:4
+    container_name: sge-adminer
+    restart: unless-stopped
+    profiles: ["ferramentas"]
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_dados:

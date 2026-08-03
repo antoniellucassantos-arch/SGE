@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# SGE - Sistema de Gestao Escolar
+#
+# Instalacao (uma vez por clone):
+#     pip install pre-commit && pre-commit install
+#
+# Rodar em tudo, sem esperar o proximo commit:
+#     pre-commit run --all-files
+#
+# O que entra aqui e o que roda em segundos. A suite completa leva mais de um
+# minuto e fica no CI: um hook lento vira um hook que todo mundo pula com
+# `--no-verify`, e ai ele nao protege nada.
+# ---------------------------------------------------------------------------
+
+repos:
+  # --- Higiene basica de arquivo -------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^migrations/
+      - id: end-of-file-fixer
+        exclude: ^migrations/
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+      # Impede que um dump de banco ou uma foto de aluno entre no repositorio
+      # por engano. 800 KB cobre com folga qualquer arquivo de codigo.
+      - id: check-added-large-files
+        args: [--maxkb=800]
+
+      # Chave privada em commit e irreversivel: mesmo removida depois, ela
+      # continua no historico e precisa ser rotacionada.
+      - id: detect-private-key
+
+  # --- Lint -----------------------------------------------------------------
+  # A versao acompanha `[project.optional-dependencies].dev` no pyproject.
+  #
+  # Sem `ruff-format` de proposito. Adota-lo reescreveria 73 dos 142 arquivos,
+  # e em alguns o resultado e pior: a matriz de permissoes agrupa constantes
+  # por recurso na mesma linha, e o formatador quebra uma por linha —
+  # triplicando o bloco e acabando com a leitura de relance que torna a
+  # matriz auditavel. O `ruff check` cobre import, variavel nao usada e o
+  # resto do lint de verdade.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  # --- Verificacoes proprias do projeto ------------------------------------
+  - repo: local
+    hooks:
+      # Upload em `static/` e servido sem passar por login. Sao fotos de
+      # menores de idade. A regra vale para o codigo e para o arquivo.
+      - id: sem-upload-em-static
+        name: uploads nao podem ficar em app/static/
+        entry: python scripts/verificar_uploads.py
+        language: system
+        pass_filenames: false
+
+      # A CSP e `script-src 'self'`. Um `<script>` inline quebra em silencio:
+      # a pagina carrega, o grafico some, e nada aparece no log do servidor.
+      - id: sem-script-inline
+        name: sem script inline nos templates
+        entry: python scripts/verificar_templates.py
+        language: system
+        pass_filenames: false
+        files: ^app/templates/.*\.html$

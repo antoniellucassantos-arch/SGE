@@ -256,7 +256,7 @@ flask db upgrade                     # Aplica migrações pendentes
 ## Testes
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 Rodar a suíte completa:
@@ -277,12 +277,41 @@ Apenas os testes de segurança e autorização:
 pytest tests/integration/test_autorizacao.py -v
 ```
 
-**Cobertura atual:** 217 testes. A prioridade é regra de negócio e controle de
+**Cobertura atual:** 307 testes. A prioridade é regra de negócio e controle de
 acesso, não percentual: `permissoes` 99%, `seguranca` 95%, `auth_service` 90%.
 
 O arquivo `tests/integration/test_rotas.py` percorre **todas** as rotas GET
 registradas e falha se qualquer tela retornar erro. Telas novas entram na
 cobertura automaticamente.
+
+Os arquivos `test_auditoria_fase1.py` a `test_auditoria_fase4.py` guardam as
+correções da auditoria de código: cada teste ali falhava antes da respectiva
+correção. Não os remova ao refatorar — são a prova de que o bug existiu.
+
+### Ganchos de qualidade
+
+```bash
+pip install pre-commit && pre-commit install
+```
+
+Antes de cada commit: lint, higiene de arquivo, e duas verificações próprias
+do projeto — nenhum upload dentro de `app/static/` e nenhum `<script>` inline
+nos templates. As duas correspondem a falhas reais encontradas na auditoria.
+
+O CI (`.github/workflows/ci.yml`) roda a suíte em **SQLite e em PostgreSQL
+16**, além de aplicar toda a sequência de migrations no Postgres do zero
+(`upgrade → downgrade → upgrade`). O desenvolvimento é SQLite; sem esse job,
+as incompatibilidades só apareceriam no dia da entrega.
+
+### PostgreSQL local
+
+```bash
+docker compose up -d --wait
+export DATABASE_URL=postgresql+psycopg://sge:sge@localhost:5433/sge
+flask db upgrade
+```
+
+Para voltar ao SQLite, remova a variável `DATABASE_URL`.
 
 ---
 
@@ -344,6 +373,8 @@ sem `DATABASE_URL` — falha rápida em vez de operar de forma insegura.
 
 ## Documentação adicional
 
+- [CLAUDE.md](CLAUDE.md) — regras operacionais de quem mexe no código (leia
+  primeiro; as demais explicam o porquê, esta diz o quê fazer)
 - [docs/arquitetura.md](docs/arquitetura.md) — camadas, decisões e trade-offs
 - [docs/banco-de-dados.md](docs/banco-de-dados.md) — modelo de dados e relacionamentos
 - [docs/seguranca.md](docs/seguranca.md) — modelo de ameaças e defesas
