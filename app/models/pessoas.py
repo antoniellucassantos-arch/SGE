@@ -57,6 +57,39 @@ class Aluno(
         doc="Codigo interno permanente do aluno (RA). Gerado pelo sistema.",
     )
 
+    #: Campos que exigem ``aluno.ver_dados_sensiveis``.
+    #:
+    #: Reune duas coisas com pesos diferentes na LGPD, e de proposito:
+    #:
+    #: * **Saude** — dado sensivel (art. 11), coletado pelo interesse vital
+    #:   do aluno. So a equipe que precisa agir em uma emergencia deve ver.
+    #: * **Documentos** — nao sao "sensiveis" na letra da lei, mas CPF, RG,
+    #:   NIS e cartao SUS de um menor de idade identificam a pessoa e valem
+    #:   dinheiro num vazamento. O professor nao precisa deles para dar aula.
+    #:
+    #: A lista vive no model, e nao no service, porque e propriedade do
+    #: dado: qualquer camada que serialize um aluno precisa da mesma
+    #: resposta sobre o que pode sair.
+    CAMPOS_SENSIVEIS: frozenset[str] = frozenset(
+        {
+            # Documentos
+            "cpf",
+            "rg",
+            "rg_orgao_emissor",
+            "certidao_nascimento",
+            "nis",
+            "cartao_sus",
+            # Saude
+            "tipo_sanguineo",
+            "alergias",
+            "medicamentos_continuos",
+            "condicoes_saude",
+            "possui_deficiencia",
+            "descricao_deficiencia",
+            "necessita_acompanhante",
+        }
+    )
+
     # -- Documentacao civil complementar -------------------------------------
     naturalidade: Mapped[str | None] = mapped_column(String(80), nullable=True)
     uf_naturalidade: Mapped[str | None] = mapped_column(String(2), nullable=True)

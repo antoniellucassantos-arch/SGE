@@ -23,7 +23,7 @@ from app.models.enums import SituacaoCadastro, SituacaoMatricula
 from app.models.estrutura import Serie, Turma
 from app.models.matricula import Matricula
 from app.models.pessoas import Aluno, Professor
-from app.services import frequencia_service
+from app.services import aluno_service, frequencia_service
 from app.utils.validadores import formatar_cpf, formatar_telefone
 
 # ---------------------------------------------------------------------------
@@ -98,6 +98,12 @@ def relatorio_alunos(
 
     alunos = consulta.order_by(Aluno.nome_normalizado).all()
 
+    # Hoje so tem `relatorio.administrativo` quem tambem tem
+    # `aluno.ver_dados_sensiveis`, entao a mascara nunca dispara. Ela existe
+    # para o dia em que a escola conceder o relatorio ao coordenador: sem
+    # isso, a planilha entregaria o CPF de todos os alunos junto.
+    ver_documentos = aluno_service.pode_ver_dados_sensiveis()
+
     linhas = []
     for aluno in alunos:
         turma = aluno.turma_atual
@@ -109,7 +115,7 @@ def relatorio_alunos(
                 turma.identificacao_curta if turma else "Sem matricula",
                 aluno.data_nascimento.strftime("%d/%m/%Y") if aluno.data_nascimento else "",
                 str(aluno.idade) if aluno.idade is not None else "",
-                formatar_cpf(aluno.cpf),
+                formatar_cpf(aluno.cpf) if ver_documentos else "—",
                 formatar_telefone(aluno.celular or aluno.telefone),
                 responsavel.nome_completo if responsavel else "",
                 formatar_telefone(responsavel.celular or responsavel.telefone)

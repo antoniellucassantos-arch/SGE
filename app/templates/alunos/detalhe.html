@@ -186,10 +186,12 @@
             <div class="card-header"><i class="bi bi-card-text text-primary"></i> Documentos</div>
             <div class="card-body">
               <dl class="row mb-0 small">
-                <dt class="col-5 sge-texto-suave">CPF</dt>
-                <dd class="col-7 sge-numerico">{{ aluno.cpf | cpf }}</dd>
-                <dt class="col-5 sge-texto-suave">RG</dt>
-                <dd class="col-7">{{ aluno.rg or '—' }}{% if aluno.rg_orgao_emissor %} <span class="sge-texto-fraco">({{ aluno.rg_orgao_emissor }})</span>{% endif %}</dd>
+                {% if pode_ver_saude %}
+                  <dt class="col-5 sge-texto-suave">CPF</dt>
+                  <dd class="col-7 sge-numerico">{{ aluno.cpf | cpf }}</dd>
+                  <dt class="col-5 sge-texto-suave">RG</dt>
+                  <dd class="col-7">{{ aluno.rg or '—' }}{% if aluno.rg_orgao_emissor %} <span class="sge-texto-fraco">({{ aluno.rg_orgao_emissor }})</span>{% endif %}</dd>
+                {% endif %}
                 <dt class="col-5 sge-texto-suave">Nascimento</dt>
                 <dd class="col-7 sge-numerico">{{ aluno.data_nascimento | data }}</dd>
                 <dt class="col-5 sge-texto-suave">Sexo</dt>
@@ -198,9 +200,9 @@
                 <dd class="col-7">{{ aluno.naturalidade or '—' }}{% if aluno.uf_naturalidade %}/{{ aluno.uf_naturalidade }}{% endif %}</dd>
                 <dt class="col-5 sge-texto-suave">Nacionalidade</dt>
                 <dd class="col-7">{{ aluno.nacionalidade or '—' }}</dd>
-                <dt class="col-5 sge-texto-suave">Certidao</dt>
-                <dd class="col-7">{{ aluno.certidao_nascimento or '—' }}</dd>
                 {% if pode_ver_saude %}
+                  <dt class="col-5 sge-texto-suave">Certidao</dt>
+                  <dd class="col-7">{{ aluno.certidao_nascimento or '—' }}</dd>
                   <dt class="col-5 sge-texto-suave">NIS</dt>
                   <dd class="col-7 sge-numerico">{{ aluno.nis or '—' }}</dd>
                   <dt class="col-5 sge-texto-suave">Cartao SUS</dt>

@@ -48,9 +48,18 @@ def requer_permissao(*permissoes: str, exigir_todas: bool = False) -> Callable:
     perfis diferentes). Use ``exigir_todas=True`` para conjuncao.
 
         @bp.route("/alunos/novo")
+        @login_required
         @requer_permissao(Permissao.ALUNO_CRIAR)
         def novo():
             ...
+
+    Sobre o ``@login_required`` acima, que a primeira vista e redundante:
+    este decorador de fato ja recusa quem nao esta autenticado. Ele fica
+    porque as duas recusas nao sao equivalentes. O ``login_required`` passa
+    pelo ``login_manager``, que exibe a mensagem "faca login para continuar"
+    e guarda o destino pretendido; a recusa daqui e um redirect seco, pensada
+    para o caso em que a sessao expirou no meio de uma acao. Remover a linha
+    trocaria uma explicacao por uma tela de login sem contexto nenhum.
     """
 
     def decorador(funcao: Callable) -> Callable:

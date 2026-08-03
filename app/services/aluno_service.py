@@ -23,6 +23,105 @@ from app.services.excecoes import (
 from app.utils.seguranca import apenas_digitos, remover_acentos
 from app.utils.validadores import cpf_valido
 
+# ---------------------------------------------------------------------------
+# Dados sensiveis
+# ---------------------------------------------------------------------------
+#: Atributos derivados que revelam a mesma informacao dos campos protegidos.
+#:
+#: ``tem_alerta_saude`` e so um booleano, mas "este aluno tem uma condicao de
+#: saude" ja e informacao de saude — e era exibido como icone na listagem para
+#: qualquer um com ``aluno.visualizar``.
+_DERIVADOS_SENSIVEIS: frozenset[str] = frozenset({"tem_alerta_saude"})
+
+
+def pode_ver_dados_sensiveis(usuario=None) -> bool:
+    """Decide se o usuario pode enxergar saude e documentos do aluno.
+
+    A resposta vem da matriz de permissoes, e nao de uma lista de papeis
+    repetida na rota: duas fontes de verdade divergem no dia em que a escola
+    criar um papel novo — e a que fica desatualizada e sempre a mais
+    permissiva.
+    """
+    from flask_login import current_user
+
+    from app.utils.permissoes import Permissao, usuario_tem_permissao
+
+    return usuario_tem_permissao(
+        current_user if usuario is None else usuario,
+        Permissao.ALUNO_VER_DADOS_SENSIVEIS,
+    )
+
+
+class FichaAluno:
+    """Aluno com os campos sensiveis ja removidos, conforme a permissao.
+
+    Existe porque esconder o ``<td>`` no template nao esconde nada: o dado
+    ja viajou ate o navegador e esta no HTML, a um Ctrl+U de distancia. Pior,
+    a protecao passa a depender de nenhum template futuro esquecer o
+    ``{% if %}`` — uma garantia que nao se sustenta.
+
+    Entregando esta ficha em vez do model, nao ha o que vazar: os atributos
+    protegidos simplesmente valem ``None``. Todo o resto e delegado ao aluno
+    original, entao os templates continuam escritos do mesmo jeito.
+    """
+
+    __slots__ = ("_aluno", "_completa")
+
+    def __init__(self, aluno: Aluno, completa: bool) -> None:
+        object.__setattr__(self, "_aluno", aluno)
+        object.__setattr__(self, "_completa", completa)
+
+    def __getattr__(self, nome: str) -> Any:
+        if not self._completa and (
+            nome in Aluno.CAMPOS_SENSIVEIS or nome in _DERIVADOS_SENSIVEIS
+        ):
+            # Booleano protegido vira `False`, e nao `None`: um `None` em
+            # `{% if aluno.possui_deficiencia %}` funciona igual, mas em
+            # comparacao direta no Python nao.
+            return False if nome in _BOOLEANOS_SENSIVEIS else None
+        return getattr(self._aluno, nome)
+
+    def __setattr__(self, nome: str, valor: Any) -> None:
+        raise AttributeError(
+            "FichaAluno e somente leitura. Para alterar, use o proprio model."
+        )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        estado = "completa" if self._completa else "restrita"
+        return f"<FichaAluno {self._aluno.codigo} ({estado})>"
+
+
+#: Campos sensiveis de tipo booleano — ver `FichaAluno.__getattr__`.
+_BOOLEANOS_SENSIVEIS: frozenset[str] = frozenset(
+    {"possui_deficiencia", "necessita_acompanhante", "tem_alerta_saude"}
+)
+
+
+def montar_ficha(aluno: Aluno, usuario=None) -> FichaAluno:
+    """Embrulha o aluno na visao permitida ao usuario."""
+    return FichaAluno(aluno, pode_ver_dados_sensiveis(usuario))
+
+
+def montar_fichas(alunos, usuario=None) -> list[FichaAluno]:
+    """Versao em lote, para listagens.
+
+    A permissao e resolvida uma vez so: ela nao muda no meio de uma pagina.
+    """
+    completa = pode_ver_dados_sensiveis(usuario)
+    return [FichaAluno(aluno, completa) for aluno in alunos]
+
+
+def serializar(aluno: Aluno, usuario=None) -> dict[str, Any]:
+    """Aluno em ``dict``, ja filtrado pela permissao do usuario.
+
+    Usado pela API e por qualquer exportacao. Aqui os campos protegidos sao
+    **omitidos**, nao zerados: um ``"cpf": null`` no JSON informa que o campo
+    existe e que o usuario nao tem acesso — enquanto a ausencia nao informa
+    nada.
+    """
+    excluir = None if pode_ver_dados_sensiveis(usuario) else Aluno.CAMPOS_SENSIVEIS
+    return aluno.para_dicionario(excluir=excluir)
+
 
 # ---------------------------------------------------------------------------
 # Consultas

@@ -82,10 +82,17 @@ def listar():
         consulta, COLUNAS_ORDENAVEIS, coluna_padrao="nome"
     )
 
+    pagina = paginar(consulta)
+
+    # `pagina` continua sendo o objeto de paginacao (contagem, links). Os
+    # registros vao filtrados: a listagem exibia um icone de alerta de saude
+    # para qualquer um com `aluno.visualizar`, e "este aluno tem uma condicao
+    # de saude" ja e informacao de saude.
     return render_template(
         "alunos/listar.html",
         form=form,
-        pagina=paginar(consulta),
+        pagina=pagina,
+        alunos=aluno_service.montar_fichas(pagina.items),
         ordenacao={"coluna": coluna, "direcao": direcao},
         parametros=parametros_preservados("ordenar", "direcao"),
     )
@@ -102,13 +109,15 @@ def detalhe(aluno_id: int):
     """Ficha completa do aluno."""
     aluno = aluno_service.buscar(aluno_id)
 
+    # O template recebe a ficha, e nao o model: assim os dados de saude e os
+    # documentos nem chegam ao HTML de quem nao pode ve-los. `pode_ver_saude`
+    # continua existindo apenas para decidir se a secao aparece — se o
+    # template esquecer a checagem, nao ha nada para exibir.
     return render_template(
         "alunos/detalhe.html",
-        aluno=aluno,
+        aluno=aluno_service.montar_ficha(aluno),
         resumo=aluno_service.resumo_academico(aluno),
-        pode_ver_saude=current_user.tem_papel(
-            "administrador", "direcao", "secretaria"
-        ),
+        pode_ver_saude=aluno_service.pode_ver_dados_sensiveis(),
         form_responsavel=_montar_form_responsavel(),
     )
 

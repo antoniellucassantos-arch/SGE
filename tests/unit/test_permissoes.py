@@ -36,6 +36,22 @@ class TestMatrizPorPapel:
             PapelUsuario.ADMINISTRADOR, Permissao.BACKUP_RESTAURAR
         )
         assert papel_tem_permissao(
+            PapelUsuario.ADMINISTRADOR, Permissao.CONFIGURACAO_EDITAR
+        )
+
+    def test_permissao_inexistente_e_negada_mesmo_ao_administrador(self):
+        """Mudanca deliberada da Fase 4 da auditoria.
+
+        Enquanto a sentinela ``"*"`` era comparada na hora da verificacao,
+        *qualquer* string passava para o administrador — inclusive um erro de
+        digitacao. O bug ficava invisivel: a tela funcionava para quem
+        testava (o admin) e negava acesso a todos os outros papeis, sem que
+        nada apontasse para a permissao inexistente.
+
+        Agora o conjunto do administrador e o catalogo real, entao um nome
+        errado e negado para todo mundo, do mesmo jeito.
+        """
+        assert not papel_tem_permissao(
             PapelUsuario.ADMINISTRADOR, "permissao.que.nem.existe"
         )
 

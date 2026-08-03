@@ -126,15 +126,34 @@ class Permissao:
 # ---------------------------------------------------------------------------
 _P = Permissao
 
+#: Catalogo completo, derivado da propria classe :class:`Permissao`.
+#:
+#: Derivar em vez de manter uma lista a mao garante que uma permissao nova
+#: entre automaticamente no conjunto do administrador. Uma lista manual
+#: esqueceria a proxima — e o esquecimento so apareceria como "acesso negado
+#: para o admin", que ninguem imagina ser um bug de cadastro de permissao.
+TODAS_PERMISSOES: frozenset[str] = frozenset(
+    valor
+    for nome, valor in vars(_P).items()
+    if not nome.startswith("_") and isinstance(valor, str)
+)
+
 #: Permissoes concedidas a todo usuario autenticado, independentemente do papel.
+#:
+#: Ficam **so** aqui: repeti-las nos conjuntos por papel criaria cinco lugares
+#: para manter em sincronia, e um dia a remocao sairia de quatro deles.
 PERMISSOES_COMUNS: frozenset[str] = frozenset(
     {
         _P.AVISO_VISUALIZAR,
     }
 )
 
-#: Permissoes do administrador. Sentinela ``"*"`` = acesso irrestrito.
-PERMISSOES_ADMINISTRADOR: frozenset[str] = frozenset({"*"})
+#: Sentinela de acesso irrestrito. Nunca sai deste modulo: ``permissoes_do_papel``
+#: a expande para o catalogo completo antes de devolver qualquer coisa.
+ACESSO_TOTAL = "*"
+
+#: Permissoes do administrador.
+PERMISSOES_ADMINISTRADOR: frozenset[str] = frozenset({ACESSO_TOTAL})
 
 PERMISSOES_DIRECAO: frozenset[str] = frozenset(
     {
@@ -156,8 +175,8 @@ PERMISSOES_DIRECAO: frozenset[str] = frozenset(
         _P.NOTA_VISUALIZAR, _P.NOTA_EDITAR_QUALQUER, _P.AVALIACAO_GERENCIAR,
         _P.BOLETIM_VISUALIZAR, _P.BOLETIM_EMITIR,
         _P.HORARIO_VISUALIZAR, _P.HORARIO_GERENCIAR,
-        # Comunicacao e relatorios
-        _P.AVISO_VISUALIZAR, _P.AVISO_CRIAR, _P.AVISO_EDITAR_QUALQUER,
+        # Comunicacao e relatorios (AVISO_VISUALIZAR vem de PERMISSOES_COMUNS)
+        _P.AVISO_CRIAR, _P.AVISO_EDITAR_QUALQUER,
         _P.AVISO_EXCLUIR,
         _P.RELATORIO_ACADEMICO, _P.RELATORIO_ADMINISTRATIVO,
         _P.RELATORIO_EXPORTAR,
@@ -185,7 +204,7 @@ PERMISSOES_SECRETARIA: frozenset[str] = frozenset(
         _P.NOTA_VISUALIZAR,
         _P.BOLETIM_VISUALIZAR, _P.BOLETIM_EMITIR,
         _P.HORARIO_VISUALIZAR, _P.HORARIO_GERENCIAR,
-        _P.AVISO_VISUALIZAR, _P.AVISO_CRIAR,
+        _P.AVISO_CRIAR,
         _P.RELATORIO_ACADEMICO, _P.RELATORIO_ADMINISTRATIVO,
         _P.RELATORIO_EXPORTAR,
     }
@@ -204,11 +223,24 @@ PERMISSOES_PROFESSOR: frozenset[str] = frozenset(
         _P.NOTA_VISUALIZAR, _P.NOTA_LANCAR, _P.AVALIACAO_GERENCIAR,
         _P.BOLETIM_VISUALIZAR,
         _P.HORARIO_VISUALIZAR,
-        _P.AVISO_VISUALIZAR, _P.AVISO_CRIAR,
+        _P.AVISO_CRIAR,
         _P.RELATORIO_ACADEMICO,
     }
 )
 
+#: Aluno e responsavel tem exatamente as mesmas permissoes funcionais — e
+#: isso e proposital, nao um descuido.
+#:
+#: A diferenca entre os dois nao e *o que* podem fazer (ver nota, ver
+#: frequencia, ver boletim), e sim *sobre quem*: o aluno ve a si mesmo, o
+#: responsavel ve os dependentes. Essa distincao e de escopo, e escopo e
+#: camada 2 — ``pode_acessar_aluno()`` em ``decoradores.py``.
+#:
+#: Consequencia pratica que precisa ficar registrada: para estes dois papeis
+#: a camada 1 nao protege quase nada. **Toda** rota que eles alcancam depende
+#: do decorador de escopo estar presente. Esquecer um ``@exigir_acesso_aluno``
+#: aqui nao produz um erro visivel — produz um responsavel lendo o boletim do
+#: filho de outra pessoa.
 PERMISSOES_ALUNO: frozenset[str] = frozenset(
     {
         _P.DASHBOARD_ALUNO,
@@ -216,20 +248,10 @@ PERMISSOES_ALUNO: frozenset[str] = frozenset(
         _P.FREQUENCIA_VISUALIZAR,
         _P.BOLETIM_VISUALIZAR,
         _P.HORARIO_VISUALIZAR,
-        _P.AVISO_VISUALIZAR,
     }
 )
 
-PERMISSOES_RESPONSAVEL: frozenset[str] = frozenset(
-    {
-        _P.DASHBOARD_ALUNO,
-        _P.NOTA_VISUALIZAR,
-        _P.FREQUENCIA_VISUALIZAR,
-        _P.BOLETIM_VISUALIZAR,
-        _P.HORARIO_VISUALIZAR,
-        _P.AVISO_VISUALIZAR,
-    }
-)
+PERMISSOES_RESPONSAVEL: frozenset[str] = PERMISSOES_ALUNO
 
 MATRIZ_PERMISSOES: dict[PapelUsuario, frozenset[str]] = {
     PapelUsuario.ADMINISTRADOR: PERMISSOES_ADMINISTRADOR,
@@ -245,7 +267,15 @@ MATRIZ_PERMISSOES: dict[PapelUsuario, frozenset[str]] = {
 # API de consulta
 # ---------------------------------------------------------------------------
 def permissoes_do_papel(papel: PapelUsuario | str | None) -> frozenset[str]:
-    """Conjunto de permissoes concedidas a um papel."""
+    """Conjunto de permissoes concedidas a um papel.
+
+    A sentinela ``"*"`` e expandida aqui e nunca chega a quem chama. Antes
+    ela vazava no retorno, o que criava duas formas de perguntar a mesma
+    coisa — e a mais obvia (``permissao in permissoes_do_papel(papel)``)
+    respondia **errado justamente para o administrador**, negando acesso em
+    silencio. Uma unica forma correta e melhor que duas, sendo uma
+    armadilha.
+    """
     if papel is None:
         return frozenset()
 
@@ -254,13 +284,16 @@ def permissoes_do_papel(papel: PapelUsuario | str | None) -> frozenset[str]:
         if papel is None:
             return frozenset()
 
-    return MATRIZ_PERMISSOES.get(papel, frozenset()) | PERMISSOES_COMUNS
+    concedidas = MATRIZ_PERMISSOES.get(papel, frozenset())
+    if ACESSO_TOTAL in concedidas:
+        return TODAS_PERMISSOES
+
+    return concedidas | PERMISSOES_COMUNS
 
 
 def papel_tem_permissao(papel: PapelUsuario | str | None, permissao: str) -> bool:
-    """Verifica uma permissao considerando a sentinela de acesso total."""
-    concedidas = permissoes_do_papel(papel)
-    return "*" in concedidas or permissao in concedidas
+    """Verifica se um papel possui a permissao."""
+    return permissao in permissoes_do_papel(papel)
 
 
 def usuario_tem_permissao(usuario, permissao: str) -> bool:
