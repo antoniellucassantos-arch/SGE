@@ -1,10 +1,18 @@
 # ---------------------------------------------------------------------------
 # SGE - Sistema de Gestao Escolar
-# Dependencias de producao
-# Python 3.12
+# Dependencias de producao — Python 3.12
+#
+# ARQUIVO DERIVADO. Nao edite aqui.
+#
+# A fonte da verdade e `[project.dependencies]` no pyproject.toml. Este
+# arquivo existe porque servidor e imagem Docker esperam encontrar um
+# `requirements.txt` — mas versao se altera la, nao aqui.
+#
+#     pip install -e .            # equivalente a este arquivo
+#     pip install -e ".[dev]"     # + ferramentas de teste e lint
 # ---------------------------------------------------------------------------
 
-# --- Core web framework -----------------------------------------------------
+# --- Nucleo web -------------------------------------------------------------
 Flask==3.0.3
 Werkzeug==3.0.4
 Jinja2==3.1.4
@@ -44,6 +52,7 @@ Pillow==10.4.0
 python-dateutil==2.9.0.post0
 
 # --- Producao ---------------------------------------------------------------
-# Descomente ao publicar em servidor Linux com PostgreSQL:
+# Extra "producao" do pyproject.toml. Descomente ao publicar em servidor
+# Linux com PostgreSQL, ou instale com:  pip install -e ".[producao]"
 # gunicorn==23.0.0
 # psycopg[binary]==3.2.3

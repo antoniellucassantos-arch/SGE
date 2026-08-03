@@ -2,7 +2,15 @@
 # SGE - Sistema de Gestao Escolar
 # Dependencias de desenvolvimento e qualidade.
 #
-# Instalacao:  pip install -r requirements.txt -r requirements-dev.txt
+# ARQUIVO DERIVADO. Nao edite aqui.
+#
+# A fonte da verdade e `[project.optional-dependencies].dev` no
+# pyproject.toml. Prefira:
+#
+#     pip install -e ".[dev]"
+#
+# O caminho antigo continua funcionando:
+#     pip install -r requirements.txt -r requirements-dev.txt
 # ---------------------------------------------------------------------------
 
 # --- Testes -----------------------------------------------------------------
