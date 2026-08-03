@@ -73,7 +73,10 @@ class BaseConfig:
     # Aqui os arquivos so saem por rota autenticada
     # (ver ``app/utils/arquivos.py::responder_arquivo``).
     PASTA_UPLOADS = BASE_DIR / "uploads"
-    PASTA_BACKUPS = BASE_DIR / "database" / "backups"
+    # Antes era `database/backups/`. O nome `database/` sugeria que o banco
+    # morava ali — ele mora em `instance/` — e concorria com `migrations/`
+    # para a pergunta "onde fica o banco?". A pasta so guardava backups.
+    PASTA_BACKUPS = BASE_DIR / "backups"
     PASTA_LOGS = BASE_DIR / "logs"
 
     #: Subpastas criadas na inicializacao, uma por tipo de anexo.

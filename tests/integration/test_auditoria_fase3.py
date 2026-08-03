@@ -79,7 +79,7 @@ class TestSessaoAposFalha:
         Nesses casos a transacao fica abortada e *toda* consulta seguinte
         falha com ``InFailedSqlTransaction``.
         """
-        from app import _carregar_ano_letivo_corrente
+        from app.hooks import carregar_ano_letivo_corrente
 
         desfeita = {"chamado": False}
         rollback_original = db.session.rollback
@@ -94,7 +94,7 @@ class TestSessaoAposFalha:
         monkeypatch.setattr(db.session, "rollback", espiao_rollback)
         monkeypatch.setattr(db.session, "query", consulta_que_falha)
 
-        assert _carregar_ano_letivo_corrente() is None
+        assert carregar_ano_letivo_corrente() is None
         assert desfeita["chamado"], "a transacao ficou suja apos a falha"
 
     def test_falha_ao_carregar_a_escola_desfaz_a_transacao(self, app, monkeypatch):

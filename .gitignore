@@ -41,8 +41,8 @@ uploads/
 
 
 # Backups gerados pelo sistema
-database/backups/*
-!database/backups/.gitkeep
+backups/*
+!backups/.gitkeep
 
 # Logs
 logs/*

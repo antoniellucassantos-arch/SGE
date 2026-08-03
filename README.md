@@ -134,9 +134,17 @@ flask popular-demonstracao --alunos 60
 ```
 sge/
 ├── app/
-│   ├── __init__.py            # Application Factory (create_app)
+│   ├── __init__.py            # Application Factory (create_app) — só orquestra
+│   ├── versao.py              # __version__
 │   ├── extensions.py          # Instâncias das extensões Flask
-│   ├── cli.py                 # Comandos `flask ...`
+│   ├── logging_config.py      # Log em arquivo rotativo e console
+│   ├── errors.py              # Handlers de erro e negociação HTML/JSON
+│   ├── hooks.py               # before/after request, cabeçalhos de segurança
+│   ├── jinja_setup.py         # Filtros, globais e contexto dos templates
+│   ├── commands/              # Comandos `flask ...`
+│   │   ├── banco.py           # Estrutura e dados iniciais
+│   │   ├── usuarios.py        # Contas de acesso
+│   │   └── manutencao.py      # Backup, retenção e diagnóstico
 │   │
 │   ├── models/                # Camada de dados (SQLAlchemy)
 │   │   ├── base.py            # ModeloBase e mixins comuns
@@ -163,7 +171,7 @@ sge/
 ├── tests/                     # Suíte automatizada
 ├── scripts/                   # Seed de demonstração
 ├── docs/                      # Documentação técnica
-├── database/backups/          # Backups gerados
+├── backups/                   # Backups gerados
 ├── uploads/                   # Arquivos enviados
 └── instance/                  # Banco SQLite local (não versionado)
 ```

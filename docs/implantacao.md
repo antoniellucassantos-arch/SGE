@@ -247,7 +247,7 @@ mesmo fora da janela.
 Exemplo com `rclone` para armazenamento em nuvem:
 
 ```bash
-0 3 * * * rclone sync /opt/sge/database/backups remoto:sge-backups --max-age 30d
+0 3 * * * rclone sync /opt/sge/backups remoto:sge-backups --max-age 30d
 ```
 
 ### 4.5 Restaurar
@@ -264,7 +264,7 @@ Procedimento resumido:
 4. Restaure:
 
 ```bash
-gunzip -c /opt/sge/database/backups/sge_AAAAMMDD_HHMMSS_manual.sql.gz | psql "$DATABASE_URL"
+gunzip -c /opt/sge/backups/sge_AAAAMMDD_HHMMSS_manual.sql.gz | psql "$DATABASE_URL"
 ```
 
 5. Reinicie: `sudo systemctl start sge`
