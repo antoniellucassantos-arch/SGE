@@ -14,6 +14,7 @@ from app.services import auditoria_service
 from app.services.excecoes import (
     ErroConflito,
     ErroOperacaoBanco,
+    ErroPermissao,
     ErroRegraNegocio,
     ErroValidacao,
     RegistroNaoEncontrado,
@@ -234,8 +235,48 @@ def _garantir_outro_administrador(usuario: Usuario, novo_papel: str) -> None:
         )
 
 
-def redefinir_senha(usuario: Usuario) -> str:
-    """Gera uma senha temporaria e exige a troca no proximo acesso."""
+#: Autoridade administrativa de cada papel, do maior para o menor.
+#:
+#: Serve a uma pergunta so: quem pode redefinir a senha de quem. Nao e uma
+#: hierarquia de permissoes — a matriz continua sendo concessao explicita,
+#: sem heranca. E apenas o reconhecimento de que redefinir a senha de alguem
+#: e assumir a conta daquela pessoa.
+NIVEL_AUTORIDADE: dict[PapelUsuario, int] = {
+    PapelUsuario.ADMINISTRADOR: 3,
+    PapelUsuario.DIRECAO: 2,
+    PapelUsuario.SECRETARIA: 1,
+    PapelUsuario.PROFESSOR: 0,
+    PapelUsuario.ALUNO: 0,
+    PapelUsuario.RESPONSAVEL: 0,
+}
+
+
+def _nivel(usuario) -> int:
+    return NIVEL_AUTORIDADE.get(getattr(usuario, "papel", None), 0)
+
+
+def redefinir_senha(usuario: Usuario, autor=None) -> str:
+    """Gera uma senha temporaria e exige a troca no proximo acesso.
+
+    Args:
+        autor: quem esta redefinindo. Quando informado, nao pode redefinir a
+            senha de uma conta com mais autoridade que a propria.
+
+    Sobre a trava de autoridade: redefinir a senha de alguem e, na pratica,
+    assumir a conta daquela pessoa. Sem esta verificacao, conceder apenas
+    ``usuario.redefinir_senha`` a Direcao entregaria tudo o que a decisao
+    quis deixar de fora — bastava redefinir a senha do administrador e entrar
+    com ela, levando backup, restauracao e exclusao definitiva junto.
+
+    ``autor=None`` (CLI, seed, rotina de manutencao) passa sem verificacao:
+    ali o controle e o acesso ao servidor, nao a matriz de permissoes.
+    """
+    if autor is not None and _nivel(autor) < _nivel(usuario):
+        raise ErroPermissao(
+            "Voce nao pode redefinir a senha de uma conta com mais "
+            "autoridade que a sua."
+        )
+
     senha = gerar_senha_temporaria()
     usuario.definir_senha(senha, exigir_troca=True)
     usuario.desbloquear()

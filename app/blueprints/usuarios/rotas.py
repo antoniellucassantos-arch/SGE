@@ -151,7 +151,7 @@ def redefinir_senha(usuario_id: int):
     usuario = usuario_service.buscar(usuario_id)
 
     try:
-        senha = usuario_service.redefinir_senha(usuario)
+        senha = usuario_service.redefinir_senha(usuario, autor=current_user)
     except ErroDominio as erro:
         flash(erro.mensagem, "danger")
     else:

@@ -245,6 +245,79 @@ class TestDadosSensiveisDoAluno:
 # ===========================================================================
 # 4.4 — Limpezas
 # ===========================================================================
+# ===========================================================================
+# 4.2 — Direcao redefine senha (decisao de produto confirmada)
+# ===========================================================================
+@pytest.fixture
+def direcao(app):
+    from tests.conftest import criar_usuario
+
+    return criar_usuario("direcao@escola.com.br", PapelUsuario.DIRECAO, "Diretora")
+
+
+class TestDirecaoRedefineSenha:
+    def test_direcao_recebeu_apenas_a_redefinicao(self):
+        """A escola optou pelo recorte minimo, nao pela proposta inteira."""
+        assert papel_tem_permissao(
+            PapelUsuario.DIRECAO, Permissao.USUARIO_REDEFINIR_SENHA
+        )
+
+        for negada in (
+            Permissao.USUARIO_CRIAR,
+            Permissao.USUARIO_EDITAR,
+            Permissao.USUARIO_EXCLUIR,
+            Permissao.CONFIGURACAO_EDITAR,
+            Permissao.BACKUP_EXECUTAR,
+        ):
+            assert not papel_tem_permissao(PapelUsuario.DIRECAO, negada)
+
+    def test_direcao_redefine_a_senha_de_um_professor(
+        self, app, direcao, professor
+    ):
+        from app.services import usuario_service
+
+        senha = usuario_service.redefinir_senha(professor.usuario, autor=direcao)
+
+        assert senha
+        assert professor.usuario.deve_trocar_senha
+
+    def test_direcao_nao_redefine_a_senha_do_administrador(
+        self, app, direcao, admin
+    ):
+        """Sem esta trava, "so redefinir senha" vira acesso total.
+
+        A diretora redefine a senha do administrador, entra com ela e leva
+        junto backup, restauracao e exclusao definitiva — tudo o que a
+        decisao de produto quis deixar de fora.
+        """
+        from app.services import usuario_service
+        from app.services.excecoes import ErroPermissao
+
+        hash_antes = admin.senha_hash
+
+        with pytest.raises(ErroPermissao):
+            usuario_service.redefinir_senha(admin, autor=direcao)
+
+        assert admin.senha_hash == hash_antes
+        assert not admin.deve_trocar_senha
+
+    def test_administrador_redefine_a_senha_de_qualquer_um(
+        self, app, admin, direcao
+    ):
+        from app.services import usuario_service
+
+        assert usuario_service.redefinir_senha(direcao, autor=admin)
+
+    def test_bloqueio_vale_pela_rota(self, app, cliente, direcao, admin, autenticar):
+        """A trava vive no service, entao a rota herda — mas confirma."""
+        autenticar(direcao)
+        resposta = cliente.post(f"/usuarios/{admin.id}/redefinir-senha")
+
+        assert resposta.status_code in (302, 403)
+        db.session.refresh(admin)
+        assert not admin.deve_trocar_senha
+
+
 class TestHigieneDaMatriz:
     def test_permissao_comum_nao_e_repetida_nos_papeis(self):
         """Repetida em cinco lugares, um dia sai de quatro e fica em um."""

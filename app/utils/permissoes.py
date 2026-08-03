@@ -159,7 +159,18 @@ PERMISSOES_DIRECAO: frozenset[str] = frozenset(
     {
         _P.DASHBOARD_ADMINISTRATIVO,
         # Pessoas: visualiza e edita, mas nao gerencia contas de acesso.
-        _P.USUARIO_VISUALIZAR,
+        #
+        # A excecao e a redefinicao de senha, concedida por decisao da escola
+        # (item 4.2 da auditoria): o pedido do dia a dia e "o professor
+        # esqueceu a senha na vespera do conselho de classe", e depender do
+        # administrador para isso empurra a escola para a conta compartilhada
+        # — que apaga a matriz inteira e a auditoria junto.
+        #
+        # Criar conta, editar papel e mexer nas configuracoes continuam fora.
+        # A trava contra redefinir a senha de quem tem mais autoridade vive em
+        # `usuario_service.redefinir_senha()`: sem ela, esta unica permissao
+        # daria acesso total pela porta dos fundos.
+        _P.USUARIO_VISUALIZAR, _P.USUARIO_REDEFINIR_SENHA,
         _P.ALUNO_VISUALIZAR, _P.ALUNO_CRIAR, _P.ALUNO_EDITAR,
         _P.ALUNO_VER_DADOS_SENSIVEIS,
         _P.PROFESSOR_VISUALIZAR, _P.PROFESSOR_CRIAR, _P.PROFESSOR_EDITAR,
