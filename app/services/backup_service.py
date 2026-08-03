@@ -26,6 +26,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
+from contextlib import closing
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -157,8 +158,13 @@ def _backup_sqlite(destino: Path) -> None:
     try:
         # A API de backup do sqlite3 garante consistencia transacional,
         # diferente de uma copia bruta do arquivo.
-        with sqlite3.connect(str(origem)) as conexao_origem:
-            with sqlite3.connect(str(temporario)) as conexao_destino:
+        #
+        # `closing()` e obrigatorio: `with sqlite3.connect(...)` gerencia
+        # apenas a transacao, nao fecha a conexao. Sem fechar, o arquivo
+        # temporario continua aberto e o Windows recusa remove-lo
+        # (WinError 32), fazendo todo backup falhar.
+        with closing(sqlite3.connect(str(origem))) as conexao_origem:
+            with closing(sqlite3.connect(str(temporario))) as conexao_destino:
                 conexao_origem.backup(conexao_destino)
 
         with open(temporario, "rb") as entrada:
