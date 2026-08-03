@@ -19,6 +19,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -241,11 +242,15 @@ class ResultadoDisciplina(ModeloBase, TimestampMixin):
         index=True,
     )
 
-    # Medias por periodo: ate 4 bimestres (ou 3 trimestres, deixando o 4o nulo).
-    media_periodo_1: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
-    media_periodo_2: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
-    media_periodo_3: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
-    media_periodo_4: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # Medias por periodo, indexadas pela ordem do periodo ("1", "2", ...).
+    #
+    # Antes eram quatro colunas fixas (media_periodo_1..4). Uma escola com
+    # cinco periodos perdia o ultimo em silencio — a media anual saia errada
+    # e ninguem percebia. Guardar em JSON acompanha qualquer divisao do ano
+    # (bimestral, trimestral, semestral ou personalizada).
+    medias_periodos: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
 
     media_anual: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     nota_recuperacao: Mapped[Decimal | None] = mapped_column(
@@ -276,18 +281,55 @@ class ResultadoDisciplina(ModeloBase, TimestampMixin):
     turma_disciplina = relationship("TurmaDisciplina", lazy="joined")
 
     # ------------------------------------------------------------------
+    # Medias por periodo
+    # ------------------------------------------------------------------
+    def media_do_periodo(self, ordem: int) -> Decimal | None:
+        """Media de um periodo especifico, pela ordem (1, 2, 3...)."""
+        valor = (self.medias_periodos or {}).get(str(ordem))
+        return Decimal(valor) if valor is not None else None
+
     def medias_por_periodo(self) -> list[Decimal | None]:
-        return [
-            self.media_periodo_1,
-            self.media_periodo_2,
-            self.media_periodo_3,
-            self.media_periodo_4,
-        ]
+        """Medias na ordem dos periodos, sem tamanho fixo.
+
+        O comprimento acompanha quantos periodos o ano letivo realmente tem.
+        """
+        registradas = self.medias_periodos or {}
+        if not registradas:
+            return []
+
+        maior = max(int(ordem) for ordem in registradas)
+        return [self.media_do_periodo(ordem) for ordem in range(1, maior + 1)]
 
     def definir_media_periodo(self, ordem: int, valor: Decimal | None) -> None:
-        """Grava a media do periodo pela ordem (1 a 4)."""
-        if 1 <= ordem <= 4:
-            setattr(self, f"media_periodo_{ordem}", valor)
+        """Grava a media de um periodo.
+
+        Reatribui o dicionario inteiro: mutacao in-place em coluna JSON nao
+        e detectada pelo SQLAlchemy e a alteracao seria perdida no commit.
+        """
+        if ordem < 1:
+            return
+
+        registradas = dict(self.medias_periodos or {})
+        registradas[str(ordem)] = str(valor) if valor is not None else None
+        self.medias_periodos = registradas
+
+    # Acessores nomeados, usados por boletim e relatorios. Mantem legivel o
+    # caso majoritario (ate quatro periodos) sem prender o modelo a ele.
+    @property
+    def media_periodo_1(self) -> Decimal | None:
+        return self.media_do_periodo(1)
+
+    @property
+    def media_periodo_2(self) -> Decimal | None:
+        return self.media_do_periodo(2)
+
+    @property
+    def media_periodo_3(self) -> Decimal | None:
+        return self.media_do_periodo(3)
+
+    @property
+    def media_periodo_4(self) -> Decimal | None:
+        return self.media_do_periodo(4)
 
     @property
     def nome_disciplina(self) -> str:

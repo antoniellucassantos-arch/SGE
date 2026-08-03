@@ -91,6 +91,16 @@ class AnoLetivo(ModeloBase, TimestampMixin):
     nota_maxima: Mapped[float] = mapped_column(
         Numeric(4, 2), nullable=False, default=10.00
     )
+    minimo_aulas_para_apurar_falta: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=20,
+        doc=(
+            "Volume minimo de aulas antes de reprovar por falta. Evita "
+            "reprovar alguem em marco por duas ausencias. Fica aqui, e nao "
+            "fixo no codigo, porque a carga horaria varia entre escolas."
+        ),
+    )
 
     # -- Relacionamentos -----------------------------------------------------
     periodos = relationship(

@@ -31,7 +31,6 @@ from typing import Any
 
 from flask import has_request_context
 from flask_login import current_user
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
@@ -98,19 +97,32 @@ def periodos_do_ano(ano_letivo_id: int) -> list[PeriodoLetivo]:
     )
 
 
-def matriculas_da_turma(turma_id: int) -> list[Matricula]:
-    """Matriculas ativas da turma em ordem alfabetica."""
-    return (
+def matriculas_da_turma(
+    turma_id: int, incluir_inativas: bool = False
+) -> list[Matricula]:
+    """Matriculas da turma em ordem alfabetica.
+
+    Args:
+        incluir_inativas: inclui transferidos, trancados e concluidos.
+
+    O padrao continua sendo apenas as ativas — e o que interessa para lancar
+    nota e fazer chamada. Mas um aluno transferido em outubro precisa de
+    boletim parcial e de correcao de nota; sem esta opcao, ele ficava
+    inalcancavel pelos fluxos de historico.
+    """
+    consulta = (
         db.session.query(Matricula)
         .join(Aluno, Matricula.aluno_id == Aluno.id)
         .filter(
             Matricula.turma_id == turma_id,
-            Matricula.situacao == SituacaoMatricula.ATIVA,
             Matricula.excluido_em.is_(None),
         )
-        .order_by(Aluno.nome_normalizado)
-        .all()
     )
+
+    if not incluir_inativas:
+        consulta = consulta.filter(Matricula.situacao == SituacaoMatricula.ATIVA)
+
+    return consulta.order_by(Aluno.nome_normalizado).all()
 
 
 # ---------------------------------------------------------------------------
@@ -546,7 +558,11 @@ def calcular_media_periodo(
             Nota.matricula_id == matricula_id,
             Avaliacao.turma_disciplina_id == vinculo_id,
             Avaliacao.periodo_id == periodo_id,
-            Avaliacao.tipo != TipoAvaliacao.RECUPERACAO,
+            # Nenhuma recuperacao entra na media ponderada: elas substituem
+            # o resultado, e nao compoem com ele.
+            Avaliacao.tipo.notin_(
+                [TipoAvaliacao.RECUPERACAO, TipoAvaliacao.RECUPERACAO_FINAL]
+            ),
         )
         .all()
     )
@@ -561,13 +577,9 @@ def calcular_media_periodo(
 
         houve_lancamento = True
         peso = Decimal(str(avaliacao.peso or 1))
-        maximo = Decimal(str(avaliacao.valor_maximo or 10))
 
-        # Normaliza para a escala 0-10 quando a avaliacao vale outro maximo
-        # (ex.: um trabalho de 20 pontos).
-        valor = nota.valor_efetivo
-        if maximo and maximo != Decimal("10"):
-            valor = (valor / maximo) * Decimal("10")
+        # Escala unica em todo o calculo — ver `_normalizar`.
+        valor = _normalizar(nota.valor_efetivo, avaliacao) or Decimal("0")
 
         soma_valores += valor * peso
         soma_pesos += peso
@@ -585,25 +597,65 @@ def calcular_media_periodo(
     return _arredondar(media)
 
 
+def _normalizar(valor: Decimal | None, avaliacao: Avaliacao) -> Decimal | None:
+    """Converte a nota para a escala 0-10 usada em todos os calculos.
+
+    Uma avaliacao pode valer 20, 100 ou qualquer outro maximo. Sem esta
+    conversao, uma recuperacao cadastrada valendo 100 seria sempre maior que
+    a media e substituiria tudo — o aluno "passaria" com 50 de 100, que
+    equivale a 5,0.
+    """
+    if valor is None:
+        return None
+
+    maximo = Decimal(str(avaliacao.valor_maximo or 10))
+    if maximo <= 0 or maximo == Decimal("10"):
+        return _arredondar(valor)
+
+    return _arredondar((Decimal(str(valor)) / maximo) * Decimal("10"))
+
+
 def _nota_recuperacao(
     matricula_id: int, vinculo_id: int, periodo_id: int | None = None
 ) -> Decimal | None:
-    """Maior nota de recuperacao lancada no escopo informado."""
+    """Maior nota de recuperacao, normalizada para a escala 0-10.
+
+    Args:
+        periodo_id: quando informado, busca a **recuperacao do periodo**
+            (``TipoAvaliacao.RECUPERACAO``); quando ausente, busca a
+            **recuperacao final** (``RECUPERACAO_FINAL``).
+
+    A distincao existe porque antes o mesmo registro era contado duas vezes:
+    a recuperacao do 2o bimestre ja substituia a media daquele periodo e, na
+    apuracao anual, reaparecia como recuperacao final, substituindo a media
+    do ano inteiro. Um aluno com 4,0 / rec 7,0 / 4,0 / 4,0 terminava com
+    7,0 em vez de 4,75.
+    """
+    tipo = (
+        TipoAvaliacao.RECUPERACAO if periodo_id else TipoAvaliacao.RECUPERACAO_FINAL
+    )
+
     consulta = (
-        db.session.query(func.max(Nota.valor))
+        db.session.query(Nota, Avaliacao)
         .join(Avaliacao, Nota.avaliacao_id == Avaliacao.id)
         .filter(
             Nota.matricula_id == matricula_id,
             Avaliacao.turma_disciplina_id == vinculo_id,
-            Avaliacao.tipo == TipoAvaliacao.RECUPERACAO,
+            Avaliacao.tipo == tipo,
             Nota.valor.isnot(None),
         )
     )
     if periodo_id:
         consulta = consulta.filter(Avaliacao.periodo_id == periodo_id)
 
-    valor = consulta.scalar()
-    return _arredondar(valor) if valor is not None else None
+    # O maximo e calculado apos a normalizacao: comparar valores em escalas
+    # diferentes no SQL (`func.max`) daria o resultado errado.
+    normalizadas = [
+        _normalizar(nota.valor, avaliacao) for nota, avaliacao in consulta.all()
+    ]
+    validas = [valor for valor in normalizadas if valor is not None]
+
+    return max(validas) if validas else None
 
 
 def calcular_resultado_disciplina(
@@ -633,8 +685,10 @@ def calcular_resultado_disciplina(
         db.session.add(resultado)
 
     # --- Medias por periodo ---
+    # Percorre TODOS os periodos do ano. O antigo `periodos[:4]` descartava
+    # o quinto em silencio, produzindo media anual errada sem aviso nenhum.
     medias: list[Decimal] = []
-    for periodo in periodos[:4]:
+    for periodo in periodos:
         media = calcular_media_periodo(matricula.id, vinculo.id, periodo.id)
         resultado.definir_media_periodo(periodo.ordem, media)
         if media is not None:
@@ -645,12 +699,15 @@ def calcular_resultado_disciplina(
     )
 
     # --- Recuperacao final ---
+    # Sem `periodo_id`, `_nota_recuperacao` busca apenas RECUPERACAO_FINAL:
+    # a recuperacao de bimestre ja foi aplicada na media daquele periodo.
     resultado.nota_recuperacao = _nota_recuperacao(matricula.id, vinculo.id)
 
     media_final = resultado.media_anual
-    if resultado.nota_recuperacao is not None:
-        if media_final is None or resultado.nota_recuperacao > media_final:
-            media_final = resultado.nota_recuperacao
+    if resultado.nota_recuperacao is not None and (
+        media_final is None or resultado.nota_recuperacao > media_final
+    ):
+        media_final = resultado.nota_recuperacao
     resultado.media_final = media_final
 
     # --- Frequencia ---
@@ -664,37 +721,64 @@ def calcular_resultado_disciplina(
     )
 
     # --- Resultado ---
-    resultado.resultado = _apurar_resultado(resultado, ano_letivo)
+    resultado.resultado = _apurar_resultado(
+        resultado,
+        ano_letivo,
+        total_periodos=len(periodos),
+        periodos_lancados=len(medias),
+    )
 
     _confirmar("Falha ao consolidar resultado")
     return resultado
 
 
 def _apurar_resultado(
-    resultado: ResultadoDisciplina, ano_letivo: AnoLetivo | None
+    resultado: ResultadoDisciplina,
+    ano_letivo: AnoLetivo | None,
+    total_periodos: int = 0,
+    periodos_lancados: int = 0,
 ) -> ResultadoFinal:
     """Decide o resultado final segundo as regras do ano letivo.
 
-    A frequencia e verificada **antes** da media: a LDB reprova por falta
-    independentemente do desempenho academico.
+    Ordem das verificacoes:
+
+    1. **Frequencia** — a LDB reprova por falta independentemente da nota, e
+       isso vale a qualquer momento do ano: um aluno que ja perdeu 30% das
+       aulas em agosto nao "melhora" ate dezembro.
+    2. **Ano em andamento** — com periodos ainda por lancar, o resultado e
+       CURSANDO. Antes, um 7,0 no 1o bimestre fazia o boletim exibir
+       APROVADO de marco a dezembro.
+    3. **Media** — comparada com os limites do proprio ano letivo.
     """
     media_aprovacao = Decimal(str(ano_letivo.media_aprovacao if ano_letivo else 6))
     media_recuperacao = Decimal(str(ano_letivo.media_recuperacao if ano_letivo else 4))
     frequencia_minima = Decimal(str(ano_letivo.frequencia_minima if ano_letivo else 75))
+    minimo_aulas = (
+        ano_letivo.minimo_aulas_para_apurar_falta if ano_letivo else 20
+    )
 
-    # Ainda sem nota: o aluno esta cursando.
-    if resultado.media_final is None:
-        return ResultadoFinal.CURSANDO
-
-    # Reprovacao por falta so e apurada com volume minimo de aulas, para nao
-    # reprovar alguem no inicio do ano por causa de duas ausencias.
+    # --- 1. Frequencia ---
+    # O limiar de aulas evita reprovar alguem em marco por duas ausencias.
+    # Ele vem do ano letivo: a carga horaria varia entre escolas.
     if (
         resultado.percentual_frequencia is not None
-        and resultado.total_aulas >= 20
+        and resultado.total_aulas >= minimo_aulas
         and Decimal(str(resultado.percentual_frequencia)) < frequencia_minima
     ):
         return ResultadoFinal.REPROVADO_FALTA
 
+    # --- 2. Ainda sem nota ---
+    if resultado.media_final is None:
+        return ResultadoFinal.CURSANDO
+
+    # --- 3. Ano ainda em andamento ---
+    # So faz sentido dizer "aprovado" ou "reprovado" quando todos os periodos
+    # tiverem media, ou quando o ano letivo estiver encerrado.
+    ano_encerrado = bool(ano_letivo and ano_letivo.esta_encerrado)
+    if not ano_encerrado and periodos_lancados < total_periodos:
+        return ResultadoFinal.CURSANDO
+
+    # --- 4. Media ---
     media = Decimal(str(resultado.media_final))
 
     if media >= media_aprovacao:
@@ -739,13 +823,18 @@ def consolidar_matricula(matricula: Matricula) -> list[ResultadoDisciplina]:
     return resultados
 
 
-def consolidar_turma(turma: Turma) -> int:
+def consolidar_turma(turma: Turma, incluir_inativas: bool = False) -> int:
     """Recalcula os resultados de todos os alunos de uma turma.
 
     Operacao pesada, executada sob demanda no fechamento de periodo.
+
+    Args:
+        incluir_inativas: alcanca tambem transferidos e trancados. Necessario
+            no fechamento do ano, quando o historico de quem saiu no meio do
+            periodo tambem precisa ficar consolidado.
     """
     total = 0
-    for matricula in matriculas_da_turma(turma.id):
+    for matricula in matriculas_da_turma(turma.id, incluir_inativas):
         consolidar_matricula(matricula)
         total += 1
 
@@ -793,7 +882,7 @@ def montar_boletim(matricula: Matricula) -> dict[str, Any]:
             if resultado
             else [
                 calcular_media_periodo(matricula.id, vinculo.id, p.id)
-                for p in periodos[:4]
+                for p in periodos
             ]
         )
 

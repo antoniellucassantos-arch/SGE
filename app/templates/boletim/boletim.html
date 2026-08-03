@@ -72,7 +72,7 @@
             <thead>
               <tr>
                 <th>Disciplina</th>
-                {% for periodo in dados.periodos[:4] %}
+                {% for periodo in dados.periodos %}
                   <th class="text-center">{{ periodo.nome | replace('Bimestre', 'Bim') }}</th>
                 {% endfor %}
                 <th class="text-center">Media</th>
@@ -99,7 +99,7 @@
                     {% endif %}
                   </td>
 
-                  {% for indice in range(dados.periodos[:4] | length) %}
+                  {% for indice in range(dados.periodos | length) %}
                     {% set media = linha.medias[indice] if linha.medias | length > indice else None %}
                     <td class="text-center sge-numerico">
                       {% if media is not none %}

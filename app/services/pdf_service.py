@@ -282,7 +282,9 @@ def _montar_boletim(dados: dict[str, Any], estilos) -> list:
     matricula = dados["matricula"]
     turma = dados["turma"]
     ano_letivo = dados["ano_letivo"]
-    periodos = dados["periodos"][:4]
+    # Todos os periodos entram no boletim. Truncar em quatro escondia o
+    # ultimo periodo de escolas que trabalham com cinco ou mais.
+    periodos = dados["periodos"]
 
     elementos = _cabecalho(estilos, "Boletim Escolar")
 
@@ -366,11 +368,25 @@ def _montar_boletim(dados: dict[str, Any], estilos) -> list:
                 ("TEXTCOLOR", (-4, indice), (-4, indice), COR_PERIGO)
             )
 
+    # Larguras calculadas a partir do espaco util da pagina (A4 retrato menos
+    # as margens de 2 cm). Com numero variavel de periodos, medidas fixas
+    # estourariam a folha — o ReportLab nao reduz a tabela sozinho.
+    largura_util = A4[0] - 4 * cm
+    colunas_fixas = [1.6 * cm, 1.3 * cm, 1.4 * cm, 2.6 * cm]
+    disponivel = largura_util - sum(colunas_fixas)
+
     largura_periodo = 1.5 * cm
+    largura_disciplina = disponivel - largura_periodo * len(periodos)
+    if largura_disciplina < 3.2 * cm:
+        # Muitos periodos: aperta as colunas de nota, preservando espaco
+        # minimo para o nome da disciplina continuar legivel.
+        largura_disciplina = 3.2 * cm
+        largura_periodo = (disponivel - largura_disciplina) / max(len(periodos), 1)
+
     colunas = (
-        [5.4 * cm]
+        [largura_disciplina]
         + [largura_periodo] * len(periodos)
-        + [1.6 * cm, 1.3 * cm, 1.4 * cm, 2.6 * cm]
+        + colunas_fixas
     )
 
     tabela_notas = Table(linhas, colWidths=colunas, repeatRows=1)

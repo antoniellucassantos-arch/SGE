@@ -178,13 +178,30 @@ class ResultadoFinal(EnumDominio):
 
 
 class TipoAvaliacao(EnumDominio):
+    """Instrumentos avaliativos.
+
+    As duas recuperacoes sao tipos **distintos** de proposito. Antes havia
+    apenas ``RECUPERACAO``, e a mesma nota era usada duas vezes: uma para
+    substituir a media do periodo e outra, de novo, como recuperacao final —
+    inflando a media anual em silencio.
+    """
+
     PROVA = ("prova", "Prova", "primary")
     TRABALHO = ("trabalho", "Trabalho", "info")
     SEMINARIO = ("seminario", "Seminario", "info")
     PARTICIPACAO = ("participacao", "Participacao", "secondary")
     PROJETO = ("projeto", "Projeto", "success")
-    RECUPERACAO = ("recuperacao", "Recuperacao", "warning")
+    RECUPERACAO = ("recuperacao", "Recuperacao do periodo", "warning")
+    RECUPERACAO_FINAL = ("recuperacao_final", "Recuperacao final", "danger")
     OUTRO = ("outro", "Outro", "secondary")
+
+    @property
+    def e_recuperacao(self) -> bool:
+        """Recuperacoes ficam fora da media ponderada do periodo."""
+        return self in {
+            TipoAvaliacao.RECUPERACAO,
+            TipoAvaliacao.RECUPERACAO_FINAL,
+        }
 
 
 class SituacaoPresenca(EnumDominio):
