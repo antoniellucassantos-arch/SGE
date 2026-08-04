@@ -247,6 +247,7 @@ def _processar_foto(form: AlunoForm, foto_atual: str | None) -> str | None:
 @bp.route("/<int:aluno_id>/excluir", methods=["POST"])
 @login_required
 @requer_permissao(Permissao.ALUNO_EXCLUIR)
+@exigir_acesso_aluno()
 def excluir(aluno_id: int):
     """Exclui logicamente o aluno preservando o historico escolar."""
     aluno = aluno_service.buscar(aluno_id)
@@ -269,6 +270,7 @@ def excluir(aluno_id: int):
 @bp.route("/<int:aluno_id>/foto/remover", methods=["POST"])
 @login_required
 @requer_permissao(Permissao.ALUNO_EDITAR)
+@exigir_acesso_aluno()
 def remover_foto(aluno_id: int):
     """Remove a foto do aluno."""
     aluno = aluno_service.buscar(aluno_id)
@@ -357,6 +359,7 @@ def revogar_consentimento(aluno_id: int, consentimento_id: int):
 @bp.route("/<int:aluno_id>/responsaveis/vincular", methods=["POST"])
 @login_required
 @requer_permissao(Permissao.ALUNO_EDITAR)
+@exigir_acesso_aluno()
 def vincular_responsavel(aluno_id: int):
     """Vincula um responsavel ao aluno."""
     aluno = aluno_service.buscar(aluno_id)
@@ -390,6 +393,7 @@ def vincular_responsavel(aluno_id: int):
 @bp.route("/<int:aluno_id>/responsaveis/<int:responsavel_id>/remover", methods=["POST"])
 @login_required
 @requer_permissao(Permissao.ALUNO_EDITAR)
+@exigir_acesso_aluno()
 def desvincular_responsavel(aluno_id: int, responsavel_id: int):
     """Remove o vinculo entre o aluno e um responsavel."""
     aluno = aluno_service.buscar(aluno_id)

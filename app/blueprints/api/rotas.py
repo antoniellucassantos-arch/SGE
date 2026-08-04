@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from app.blueprints.api import bp
 from app.services import dashboard_service, turma_service
 from app.services.excecoes import ErroDominio
-from app.utils.decoradores import pode_acessar_turma, requer_permissao
+from app.utils.decoradores import exigir_acesso_turma, requer_permissao
 from app.utils.permissoes import Permissao
 
 
@@ -141,11 +141,15 @@ def turmas():
 @bp.route("/turmas/<int:turma_id>/alunos")
 @login_required
 @requer_permissao(Permissao.ALUNO_VISUALIZAR)
+@exigir_acesso_turma()
 def alunos_da_turma(turma_id: int):
-    """Alunos matriculados em uma turma."""
-    if not pode_acessar_turma(turma_id):
-        return _erro("Voce nao tem acesso a esta turma.", 403)
+    """Alunos matriculados em uma turma.
 
+    O escopo vai pelo decorador, e nao por um ``if`` aqui dentro: a checagem
+    manual funcionava, mas dependia de alguem lembrar de escreve-la na
+    proxima rota. O 403 sai em JSON porque o handler negocia o formato pelo
+    prefixo ``/api/``.
+    """
     turma = turma_service.buscar_turma(turma_id)
 
     return _ok(

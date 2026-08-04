@@ -18,8 +18,8 @@ from app.blueprints.matriculas.formularios import (
 from app.models.matricula import Matricula
 from app.models.pessoas import Aluno
 from app.services import matricula_service, turma_service
-from app.services.excecoes import ErroDominio
-from app.utils.decoradores import requer_permissao
+from app.services.excecoes import ErroDominio, ErroPermissao
+from app.utils.decoradores import pode_acessar_aluno, requer_permissao
 from app.utils.paginacao import (
     aplicar_ordenacao,
     filtro_texto,
@@ -97,6 +97,13 @@ def listar():
 def detalhe(matricula_id: int):
     """Detalhe da matricula com as acoes disponiveis."""
     matricula = matricula_service.buscar(matricula_id)
+
+    # O id da URL e o da matricula, nao o do aluno — `exigir_acesso_aluno()`
+    # le de `kwargs` e nao teria o que conferir aqui. Sem esta linha, um
+    # professor com MATRICULA_VISUALIZAR percorria /matriculas/1,
+    # /matriculas/2... e lia a ficha de qualquer aluno da escola.
+    if not pode_acessar_aluno(matricula.aluno_id):
+        raise ErroPermissao("Voce nao tem acesso aos dados deste aluno.")
 
     form_turma = TransferirTurmaForm()
     turmas = matricula_service.turmas_com_vaga(matricula.ano_letivo_id)

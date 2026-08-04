@@ -11,7 +11,11 @@ from app.models.estrutura import Sala
 from app.models.horario import Horario
 from app.services import horario_service, turma_service
 from app.services.excecoes import ErroDominio, RegistroNaoEncontrado
-from app.utils.decoradores import exigir_acesso_turma, requer_permissao
+from app.utils.decoradores import (
+    exigir_acesso_aluno,
+    exigir_acesso_turma,
+    requer_permissao,
+)
 from app.utils.permissoes import Permissao, usuario_tem_permissao
 
 
@@ -200,15 +204,17 @@ def meu_horario():
 @bp.route("/aluno/<int:aluno_id>")
 @login_required
 @requer_permissao(Permissao.HORARIO_VISUALIZAR)
+@exigir_acesso_aluno()
 def do_aluno(aluno_id: int):
-    """Grade da turma de um aluno especifico."""
+    """Grade da turma de um aluno especifico.
+
+    O escopo vai pelo decorador: o `aluno_id` da URL e exatamente o que
+    `exigir_acesso_aluno()` le. A checagem manual que existia aqui fazia o
+    mesmo, mas dependia de alguem lembrar de repeti-la na proxima rota — e
+    responsavel tem HORARIO_VISUALIZAR, entao o esquecimento entregaria a
+    grade do filho de outra familia.
+    """
     from app.services import aluno_service
-    from app.utils.decoradores import pode_acessar_aluno
-
-    if not pode_acessar_aluno(aluno_id):
-        from app.services.excecoes import ErroPermissao
-
-        raise ErroPermissao("Voce nao tem acesso aos dados deste aluno.")
 
     aluno = aluno_service.buscar(aluno_id)
     turma = aluno.turma_atual

@@ -20,6 +20,26 @@ from app.utils.permissoes import (
     usuario_tem_todas_permissoes,
 )
 
+#: Atributos que os decoradores penduram na view, para inspecao posterior.
+#:
+#: Existem para a varredura de ``tests/integration/test_escopo_de_rotas.py``,
+#: que percorre o ``url_map`` e prova que nenhuma rota com id ficou apenas
+#: com permissao funcional. Sem essa marca, a unica forma de verificar seria
+#: ler o codigo — e a regra que a auditoria encontrou quebrada tres vezes
+#: nao pode depender de alguem lembrar de ler.
+ATRIBUTO_ESCOPO = "_escopos_validados"
+ATRIBUTO_PERMISSOES = "_permissoes_exigidas"
+
+
+def _marcar(wrapper: Callable, funcao: Callable, atributo: str, *valores) -> None:
+    """Acumula uma marca no wrapper, preservando o que ja havia.
+
+    ``functools.wraps`` copia o ``__dict__`` do embrulhado, entao decoradores
+    empilhados somam suas marcas em vez de se sobrescrever.
+    """
+    herdados = tuple(getattr(funcao, atributo, ()))
+    setattr(wrapper, atributo, (*herdados, *valores))
+
 
 def _negar_acesso(motivo: str):
     """Trata uma tentativa de acesso negada de forma coerente.
@@ -80,6 +100,7 @@ def requer_permissao(*permissoes: str, exigir_todas: bool = False) -> Callable:
 
             return funcao(*args, **kwargs)
 
+        _marcar(wrapper, funcao, ATRIBUTO_PERMISSOES, *permissoes)
         return wrapper
 
     return decorador
@@ -275,6 +296,7 @@ def exigir_acesso_turma(nome_parametro: str = "turma_id") -> Callable:
                 return _negar_acesso(f"Escopo negado para turma {turma_id}")
             return funcao(*args, **kwargs)
 
+        _marcar(wrapper, funcao, ATRIBUTO_ESCOPO, nome_parametro)
         return wrapper
 
     return decorador
@@ -313,6 +335,7 @@ def exigir_vinculo(nome_parametro: str = "vinculo_id") -> Callable:
 
             return funcao(*args, **kwargs)
 
+        _marcar(wrapper, funcao, ATRIBUTO_ESCOPO, nome_parametro)
         return wrapper
 
     return decorador
@@ -329,12 +352,15 @@ def exigir_acesso_aluno(nome_parametro: str = "aluno_id") -> Callable:
                 return _negar_acesso(f"Escopo negado para aluno {aluno_id}")
             return funcao(*args, **kwargs)
 
+        _marcar(wrapper, funcao, ATRIBUTO_ESCOPO, nome_parametro)
         return wrapper
 
     return decorador
 
 
 __all__ = [
+    "ATRIBUTO_ESCOPO",
+    "ATRIBUTO_PERMISSOES",
     "requer_permissao",
     "requer_papel",
     "somente_equipe",
