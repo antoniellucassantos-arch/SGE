@@ -8,10 +8,13 @@ validacao (ex.: passar a exigir celular) valha para todos os cadastros.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from wtforms import (
     DateField,
+    DecimalField,
     EmailField,
     SelectField,
     StringField,
@@ -36,6 +39,32 @@ IMAGENS_PERMITIDAS = ("png", "jpg", "jpeg", "webp")
 
 #: Opcoes de UF prontas para ``SelectField``.
 OPCOES_UF = [("", "UF")] + [(uf, uf) for uf in UNIDADES_FEDERATIVAS]
+
+
+class CampoQuantidade(DecimalField):
+    """Campo numerico que nao exibe zeros a direita.
+
+    As colunas de peso e nota maxima sao ``Numeric(4, 2)``, entao o banco
+    devolve ``Decimal("1.00")`` e o WTForms escreve isso no campo. Peso
+    "1,00" e ruido: sugere uma precisao que nao existe e faz o professor
+    desconfiar de que o formulario esta pedindo outra coisa.
+
+    Aqui ``1.00`` vira ``1``, ``10.00`` vira ``10`` e ``2.50`` continua
+    ``2.5`` — some o zero inutil, fica o numero que a pessoa escreveria.
+    """
+
+    def _value(self) -> str:
+        if self.raw_data:
+            return self.raw_data[0]
+        if self.data is None:
+            return ""
+
+        numero = Decimal(self.data).normalize()
+        # `normalize()` reduz 10.00 a 1E+1, que renderiza como "1E+1".
+        # `quantize` traz de volta a forma que um humano escreve.
+        if numero == numero.to_integral_value():
+            numero = numero.quantize(Decimal(1))
+        return str(numero)
 
 
 class FormularioBase(FlaskForm):

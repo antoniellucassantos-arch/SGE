@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from wtforms import (
     DateField,
-    DecimalField,
     SelectField,
     StringField,
     SubmitField,
@@ -13,11 +12,29 @@ from wtforms import (
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 from app.models.enums import TipoAvaliacao
-from app.utils.formularios import FormularioBase
+from app.utils.formularios import CampoQuantidade, FormularioBase
+
+#: Menor incremento aceito em nota maxima e peso.
+#:
+#: `min` e `step` andam juntos por uma razao pratica: num
+#: ``<input type="number">`` os valores validos sao ``min + n*step``. Com
+#: ``min=0.1`` e ``step=0.5`` a escada valida era 0,1 / 0,6 / 1,1 / 1,6... —
+#: **nenhum numero redondo entrava nela**. As setinhas saiam de 1 e paravam
+#: em 1,1, e quem insistisse chegava a 10,1. Era o que fazia peso e nota
+#: maxima aparecerem sempre quebrados.
+#:
+#: Com os dois em 0,5 a escada vira 0,5 / 1 / 1,5 / 2 ... 10: inclui todo
+#: numero redondo e ainda permite meio ponto, que a escola usa.
+PASSO = 0.5
 
 
 class AvaliacaoForm(FormularioBase):
-    """Criacao e edicao de uma avaliacao."""
+    """Criacao e edicao de uma avaliacao.
+
+    A ordem dos campos segue a pergunta que o professor faz: primeiro
+    *quanto vale a prova* (nota maxima), depois *quanto ela pesa na media*.
+    Peso antes de nota maxima invertia o raciocinio.
+    """
 
     nome = StringField(
         "Nome da avaliacao",
@@ -37,25 +54,31 @@ class AvaliacaoForm(FormularioBase):
         choices=TipoAvaliacao.escolhas(),
         default=TipoAvaliacao.PROVA.value,
     )
-    peso = DecimalField(
-        "Peso",
+    valor_maximo = CampoQuantidade(
+        "Nota maxima",
         validators=[
-            DataRequired(message="Informe o peso."),
-            NumberRange(min=0.1, max=99, message="O peso deve ser maior que zero."),
-        ],
-        default=1,
-        places=2,
-        render_kw={"inputmode": "decimal", "step": "0.5"},
-    )
-    valor_maximo = DecimalField(
-        "Valor maximo",
-        validators=[
-            DataRequired(message="Informe o valor maximo."),
-            NumberRange(min=0.1, max=1000),
+            DataRequired(message="Informe quanto vale a avaliacao."),
+            NumberRange(
+                min=PASSO,
+                max=1000,
+                message="A nota maxima deve ser maior que zero.",
+            ),
         ],
         default=10,
-        places=2,
-        render_kw={"inputmode": "decimal", "step": "0.5"},
+        places=None,
+        render_kw={"inputmode": "decimal", "step": PASSO, "min": PASSO},
+    )
+    peso = CampoQuantidade(
+        "Peso na media",
+        validators=[
+            DataRequired(message="Informe o peso."),
+            NumberRange(
+                min=PASSO, max=99, message="O peso deve ser maior que zero."
+            ),
+        ],
+        default=1,
+        places=None,
+        render_kw={"inputmode": "decimal", "step": PASSO, "min": PASSO},
     )
     data_aplicacao = DateField("Data de aplicacao", validators=[Optional()])
     descricao = TextAreaField(

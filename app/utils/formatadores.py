@@ -178,6 +178,24 @@ def formatar_nota(valor, casas: int = 1, padrao: str = VAZIO) -> str:
     return f"{numero:.{casas}f}".replace(".", ",")
 
 
+def formatar_quantidade(valor, padrao: str = VAZIO) -> str:
+    """``1`` · ``10`` · ``2,5`` — numero sem zero decimal inutil.
+
+    Diferente de :func:`formatar_nota`, que sempre mostra uma casa: nota
+    "8,0" comunica precisao e faz sentido num boletim. Ja peso "1,0" e nota
+    maxima "10,0" nao — sao quantidades, e o zero a direita so faz o
+    professor procurar um decimal que nao existe.
+    """
+    numero = _para_decimal(valor)
+    if numero is None:
+        return padrao
+
+    if numero == numero.to_integral_value():
+        return str(numero.quantize(Decimal(1)))
+
+    return f"{numero.normalize():f}".replace(".", ",")
+
+
 def formatar_percentual(valor, casas: int = 1, padrao: str = VAZIO) -> str:
     """``87,5%``"""
     numero = _para_decimal(valor)

@@ -28,6 +28,7 @@ def configurar_jinja(app: Flask) -> None:
             "data_extenso": formatadores.formatar_data_extenso,
             "moeda": formatadores.formatar_moeda,
             "nota": formatadores.formatar_nota,
+            "quantidade": formatadores.formatar_quantidade,
             "percentual": formatadores.formatar_percentual,
             "cpf": formatadores.formatar_cpf_seguro,
             "telefone": formatadores.formatar_telefone_seguro,

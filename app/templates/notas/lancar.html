@@ -97,14 +97,15 @@
           <form method="post" action="{{ url_for('notas.criar_avaliacao', vinculo_id=vinculo.id) }}">
             {{ form.hidden_tag() }}
             <div class="row g-3">
-              {{ campo(form.nome, coluna='col-12 col-md-4') }}
-              {{ selecao(form.periodo_id, coluna='col-6 col-md-2') }}
-              {{ selecao(form.tipo, coluna='col-6 col-md-2') }}
-              {{ campo(form.peso, coluna='col-4 col-md-1',
-                       ajuda='Peso na media') }}
-              {{ campo(form.valor_maximo, coluna='col-4 col-md-1',
-                       ajuda='Nota maxima') }}
-              {{ campo(form.data_aplicacao, coluna='col-4 col-md-2') }}
+              {{ campo(form.nome, coluna='col-12 col-md-5') }}
+              {{ selecao(form.periodo_id, coluna='col-6 col-md-3') }}
+              {{ selecao(form.tipo, coluna='col-6 col-md-4') }}
+
+              {{ campo(form.valor_maximo, coluna='col-6 col-md-3',
+                       ajuda='Quanto vale a prova inteira. Quase sempre 10.') }}
+              {{ campo(form.peso, coluna='col-6 col-md-3',
+                       ajuda='Quantas vezes ela conta na media. Deixe 1 se todas valem igual.') }}
+              {{ campo(form.data_aplicacao, coluna='col-12 col-md-3') }}
               {{ area_texto(form.descricao, coluna='col-12', linhas=2) }}
               <div class="col-12">
                 <button type="submit" class="btn btn-primary">
@@ -112,11 +113,38 @@
                 </button>
               </div>
             </div>
-            <p class="form-text mb-0 mt-2">
-              <i class="bi bi-info-circle me-1"></i>
-              Avaliacoes do tipo <strong>Recuperacao</strong> nao entram na media
-              ponderada: elas substituem a media quando forem maiores.
-            </p>
+
+            {# Explicar peso com um exemplo numerico resolve mais que
+               qualquer rotulo: o professor le a conta e reconhece a propria
+               pratica, em vez de tentar deduzir o que o campo faz. #}
+            <div class="alert alert-light border mt-3 mb-0 small">
+              <div class="mb-2">
+                <i class="bi bi-lightbulb text-warning me-1"></i>
+                <strong>Como o peso muda a media</strong>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-md-6">
+                  Prova <strong>peso 1</strong> (nota 4) e trabalho
+                  <strong>peso 1</strong> (nota 8):<br>
+                  media <strong>6,0</strong> — os dois contam igual.
+                </div>
+                <div class="col-12 col-md-6">
+                  Prova <strong>peso 3</strong> (nota 4) e trabalho
+                  <strong>peso 1</strong> (nota 8):<br>
+                  media <strong>5,0</strong> — a prova puxa mais.
+                </div>
+              </div>
+              <hr class="my-2">
+              <div>
+                A <strong>nota maxima</strong> so diz de quanto e a avaliacao.
+                Vale 20 e o aluno tirou 15? O sistema converte para 7,5 antes
+                de calcular — todas as medias saem na escala de 0 a 10.
+              </div>
+              <div class="mt-2">
+                Avaliacao do tipo <strong>Recuperacao</strong> fica fora da
+                media ponderada: ela substitui a media quando for maior.
+              </div>
+            </div>
           </form>
         </div>
       </div>
@@ -161,8 +189,8 @@
               <div class="min-w-0">
                 <div>{{ avaliacao.nome }}</div>
                 <div class="small fw-normal sge-texto-fraco">
-                  Peso {{ avaliacao.peso | nota(1) }}
-                  &middot; vale ate {{ avaliacao.valor_maximo | nota(1) }}
+                  Peso {{ avaliacao.peso | quantidade }}
+                  &middot; vale ate {{ avaliacao.valor_maximo | quantidade }}
                   {% if avaliacao.data_aplicacao %}
                     &middot; aplicada em {{ avaliacao.data_aplicacao | data }}
                   {% endif %}
@@ -308,7 +336,7 @@
                       <th class="text-center d-none d-lg-table-cell">
                         {{ avaliacao.nome | truncar(14, '') }}
                         <div class="small fw-normal sge-texto-fraco">
-                          peso {{ avaliacao.peso | nota(1) }}
+                          peso {{ avaliacao.peso | quantidade }}
                         </div>
                       </th>
                     {% endfor %}
