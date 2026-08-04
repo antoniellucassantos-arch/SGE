@@ -93,7 +93,23 @@ def main() -> int:
 
     try:
         subprocess.run(  # noqa: S603 - argumentos controlados
-            [_interpretador(), "-m", "ruff", "check", "--fix", "--quiet", str(alvo)],
+            [
+                _interpretador(),
+                "-m",
+                "ruff",
+                "check",
+                "--fix",
+                # F401 (import nao usado) fica de fora do --fix aqui, e so
+                # aqui. No meio de uma edicao um import quase sempre e
+                # adicionado *antes* do codigo que o usa: apagado nesse
+                # instante, o erro so aparece na proxima execucao dos testes,
+                # como um NameError que parece nao ter causa. Aconteceu.
+                # O pre-commit e o CI continuam limpando import morto.
+                "--unfixable",
+                "F401",
+                "--quiet",
+                str(alvo),
+            ],
             cwd=RAIZ,
             capture_output=True,
             check=False,

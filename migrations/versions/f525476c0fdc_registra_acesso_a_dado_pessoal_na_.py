@@ -8,8 +8,9 @@ A LGPD exige rastrear a leitura quando o dado e de saude de menor de idade
 
 Detalhe que a versao gerada pelo Alembic nao tratava: o valor novo tem 19
 caracteres e a coluna era ``VARCHAR(16)`` — o maior valor anterior era
-``senha_recuperada``. Como ``native_enum=False``, o tipo e um VARCHAR com
-CHECK, e tanto o tamanho quanto a lista de valores precisam mudar.
+``senha_recuperada``. Com ``native_enum=False`` e ``create_constraint``
+desligado (o padrao do SQLAlchemy 2.0), o tipo e um VARCHAR sem CHECK, entao
+o que muda de fato e a **largura** da coluna.
 
 O ``downgrade`` **apaga** os registros de acesso antes de estreitar a
 coluna. Nao ha para onde converte-los: nenhuma acao anterior significa
@@ -68,8 +69,8 @@ def upgrade():
 
 
 def downgrade():
-    # A coluna volta a VARCHAR(16) e o CHECK volta a recusar o valor novo:
-    # qualquer linha que tenha sobrado quebraria a restricao.
+    # A coluna volta a VARCHAR(16) e o valor novo tem 19 caracteres. O SQLite
+    # ignora a largura, mas o PostgreSQL recusa — e producao e PostgreSQL.
     op.execute(
         sa.text("DELETE FROM logs_auditoria WHERE acao = :acao").bindparams(
             acao=VALOR_NOVO
