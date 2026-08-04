@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
+    DateField,
     DecimalField,
     IntegerField,
     SelectField,
@@ -187,6 +189,42 @@ class VincularResponsavelForm(FormularioFiltro):
         render_kw={"inputmode": "numeric"},
     )
     enviar = SubmitField("Vincular responsavel")
+
+
+class ConsentimentoForm(FlaskForm):
+    """Registro de uma decisao da familia sobre uma finalidade (LGPD).
+
+    ``concedido`` e ``SelectField`` e nao ``BooleanField`` de proposito: um
+    checkbox desmarcado e indistinguivel de "ninguem perguntou ainda", e a
+    diferenca entre um "nao" registrado e uma pendencia e justamente o que a
+    escola precisa saber.
+
+    Herda ``FlaskForm``, e nao ``FormularioFiltro``: o CSRF acompanha a
+    configuracao da aplicacao — ligado em producao, desligado na suite. Um
+    ``Meta.csrf = True`` fixo obrigaria cada teste de rota a montar o token a
+    mao, o que exercita o WTForms e nao a regra.
+    """
+
+    finalidade = SelectField("Finalidade", choices=[], coerce=str)
+    concedido = SelectField(
+        "Decisao",
+        choices=[("1", "Concedido"), ("0", "Negado")],
+        default="1",
+        coerce=str,
+    )
+    responsavel_id = SelectField(
+        "Quem decidiu", choices=[], validators=[Optional()], coerce=str
+    )
+    data_decisao = DateField("Data da decisao", validators=[Optional()])
+    documento = StringField(
+        "Termo assinado",
+        validators=[Optional(), Length(max=150)],
+        render_kw={"placeholder": "Numero ou protocolo do termo"},
+    )
+    observacao = TextAreaField(
+        "Observacao", validators=[Optional(), Length(max=1000)]
+    )
+    enviar = SubmitField("Registrar decisao")
 
     def validate_responsavel_id(self, campo) -> None:
         from wtforms.validators import ValidationError

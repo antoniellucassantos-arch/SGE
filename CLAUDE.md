@@ -68,6 +68,14 @@ vezes. As regras que saíram dela:
   `Aluno.CAMPOS_SENSIVEIS` e `aluno_service.montar_ficha()`.
 - **Exportação vai para a auditoria antes da entrega**, com os filtros
   aplicados. Sem os filtros não há como saber o que saiu.
+- **Antes de usar um dado para uma finalidade nova, pergunte a
+  `consentimento_service.pode_tratar(aluno_id, finalidade)`.** Não leia o
+  booleano do cadastro: ele é cópia denormalizada, mantida em sincronia pelo
+  service. Publicar foto, mandar campanha e liberar saída passam por lá.
+- **Entrega de campo sensível é registrada na trilha.** Se você criar outro
+  caminho por onde `Aluno.CAMPOS_SENSIVEIS` saia, chame
+  `auditoria_service.registrar_acesso_dado_pessoal()` junto — só os nomes
+  dos campos, nunca os valores.
 
 ---
 

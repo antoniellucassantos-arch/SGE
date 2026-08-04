@@ -291,13 +291,33 @@ definição, um registro alterável não serve como evidência.
 |---|---|
 | `usuario_id` | Nulo em eventos anônimos (falha de login com e-mail inexistente) |
 | `usuario_nome` | **Cópia** do nome no momento do evento — a trilha sobrevive à exclusão da conta |
-| `acao` | criação · atualização · exclusão · login · falha de login · acesso negado · backup · exportação |
+| `acao` | criação · atualização · exclusão · login · falha de login · acesso negado · backup · exportação · **acesso a dado pessoal** · **consentimento** |
 | `detalhes` | JSON com o *delta* (antes/depois), com campos sensíveis mascarados |
 | `endereco_ip`, `navegador`, `rota` | Contexto da requisição |
 
 Eventos negativos (falha de login, acesso negado) são gravados em sessão
 própria com commit imediato — a transação principal sofre rollback logo em
-seguida, e o registro do incidente seria perdido junto.
+seguida, e o registro do incidente seria perdido junto. `acesso_dado_pessoal`
+usa o mesmo caminho por outro motivo: abrir uma ficha é um `GET`, e sem
+commit próprio o registro morreria no teardown.
+
+### `consentimentos_lgpd`
+
+Uma decisão da família sobre uma finalidade de tratamento, para um aluno.
+
+| Campo | Observações |
+|---|---|
+| `finalidade` | O que a escola quer fazer com o dado (`FinalidadeTratamento`) |
+| `base_legal` | **Cópia** da base declarada pela finalidade na época — se a escola reclassificar amanhã, os registros antigos continuam dizendo sob qual hipótese a decisão foi tomada |
+| `concedido` | Um "não" também precisa constar: decisão tomada ≠ pendência |
+| `responsavel_id` / `responsavel_nome` | Quem decidiu, com cópia do nome |
+| `registrado_por_id` | Quem da escola lançou no sistema |
+| `documento` | Referência ao termo assinado |
+| `revogado_em` | Preenchido quando esta decisão deixa de valer |
+
+Tabela **append-only**: revogar não apaga nem edita o registro anterior. O
+estado atual de uma finalidade é o último registro dela — daí o índice
+`(aluno_id, finalidade, id)`.
 
 ### `registros_backup`
 

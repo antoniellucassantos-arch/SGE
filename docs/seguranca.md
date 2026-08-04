@@ -240,7 +240,8 @@ dele, com retenção maior e sem os controles de acesso da original.
 |---|---|
 | Minimização | Listagens exibem CPF parcial; ficha completa exige permissão específica |
 | Dados sensíveis (art. 11) | Saúde e deficiência visíveis apenas a administrador, direção e secretaria |
-| Consentimento | Autorização de uso de imagem registrada por aluno |
+| Base legal | Cada finalidade declara a sua em `FinalidadeTratamento`; só o que se apoia em consentimento é revogável |
+| Consentimento | `consentimentos_lgpd` registra quem autorizou, quando, sob qual termo — e a revogação |
 | Geolocalização | EXIF removido de toda imagem enviada |
 | Rastreabilidade (alteração) | Auditoria registra quem alterou o quê, com o delta |
 | Rastreabilidade (leitura) | `acesso_dado_pessoal` registra quem consultou documentos e saúde de qual aluno |
@@ -250,12 +251,32 @@ dele, com retenção maior e sem os controles de acesso da original.
 encarregado de dados (DPO) e definir o procedimento de atendimento a
 solicitações de titulares.
 
+### Consentimento por finalidade
+
+A escola trata dados sob **cinco bases legais** (`BaseLegalLGPD`), e
+consentimento é apenas uma delas — nem a mais comum. Matrícula, histórico e
+diário de classe se apoiam em obrigação legal e contrato: a escola não pode
+parar de emitir histórico se a família disser não, e oferecer a escolha daria
+a impressão de uma decisão que não existe. Dados de saúde se apoiam na tutela
+da saúde (art. 11, II, "f") — socorrer uma criança não espera assinatura.
+
+Por isso a base legal é atributo da **finalidade**, não da decisão individual:
+amarrar os dois em `FinalidadeTratamento` impede que se registre uma
+combinação incoerente. Só o que se apoia em consentimento é revogável.
+
+A tabela é **append-only**: revogar não apaga nem edita o registro anterior,
+cria um novo. O art. 8º, §2º põe sobre a escola o ônus de provar que o
+consentimento existiu — e um registro sobrescrito prova o presente enquanto
+destrói a evidência do passado, que é exatamente o que se pede quando a
+família contesta uma foto publicada no ano anterior.
+
+Quem decide se um dado pode ser usado é `consentimento_service.pode_tratar()`.
+Os campos `autoriza_uso_imagem` e `autorizado_sair_sozinho` do cadastro
+continuam existindo para a tela e os filtros, mantidos em sincronia pelo
+service — são cópia, não fonte da verdade.
+
 **Pendente no sistema** — itens estruturais ainda em aberto:
 
-- **Base legal e consentimento por finalidade.** Hoje há apenas o campo de
-  autorização de uso de imagem no cadastro do aluno. Falta o registro de
-  *quem* consentiu, *quando*, para *qual finalidade* e sob qual base legal —
-  e a revogação.
 - **Retenção diferenciada.** `flask limpar-auditoria --dias N` apaga tudo
   que passa do prazo, sem distinguir classes de evento. A trilha de acesso a
   dado pessoal e os acessos negados provavelmente merecem prazo maior que um

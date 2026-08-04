@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from 'componentes/campo.html' import selecao, caixa %}
+{% from 'componentes/campo.html' import area_texto, campo, caixa, selecao %}
 
 {% block titulo %}{{ aluno.nome_exibicao }}{% endblock %}
 {% block titulo_pagina %}Ficha do aluno{% endblock %}
@@ -172,6 +172,18 @@
               type="button" role="tab">
         <i class="bi bi-clock-history me-1"></i> Matriculas
         <span class="badge sge-badge-suave ms-1">{{ resumo.total_matriculas }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-consentimentos"
+              type="button" role="tab">
+        <i class="bi bi-shield-check me-1"></i> Consentimentos
+        {% if pendencias_lgpd %}
+          <span class="badge text-bg-warning ms-1"
+                title="Finalidades ainda nao perguntadas a familia">
+            {{ pendencias_lgpd | length }}
+          </span>
+        {% endif %}
       </button>
     </li>
   </ul>
@@ -432,6 +444,205 @@
             </div>
           {% endif %}
         </div>
+      </div>
+    </div>
+
+    {# ---------------- Aba: consentimentos (LGPD) ---------------- #}
+    <div class="tab-pane fade" id="aba-consentimentos" role="tabpanel">
+      <div class="row g-3">
+
+        {# --- Estado atual de cada finalidade --- #}
+        <div class="col-12 col-xl-7">
+          <div class="card h-100">
+            <div class="card-header">
+              <i class="bi bi-shield-check text-primary"></i>
+              Para que a escola usa os dados de {{ aluno.primeiro_nome }}
+            </div>
+            <div class="card-body p-0">
+              <div class="sge-tabela-wrapper">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Finalidade</th>
+                      <th>Base legal</th>
+                      <th class="text-center">Situacao</th>
+                      <th class="sge-tabela-acoes"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in consentimentos %}
+                      {% set finalidade = item.finalidade %}
+                      {% set decisao = item.decisao %}
+                      <tr>
+                        <td>
+                          <span class="fw-semibold">{{ finalidade.rotulo }}</span>
+                          <div class="small sge-texto-fraco">{{ finalidade.descricao }}</div>
+                        </td>
+                        <td class="small">
+                          <span class="badge sge-badge-suave text-bg-{{ finalidade.base_legal.cor }}">
+                            {{ finalidade.base_legal.rotulo }}
+                          </span>
+                        </td>
+                        <td class="text-center">
+                          {% if not finalidade.exige_consentimento %}
+                            <span class="badge sge-badge-suave text-bg-secondary"
+                                  title="Nao depende de autorizacao da familia">
+                              Dispensa consentimento
+                            </span>
+                          {% elif decisao %}
+                            <span class="badge sge-badge-suave text-bg-{{ decisao.situacao_cor }}">
+                              {{ decisao.situacao_rotulo }}
+                            </span>
+                            <div class="small sge-texto-fraco mt-1">
+                              {{ decisao.nome_de_quem_decidiu }} &middot;
+                              {{ decisao.data_decisao | data }}
+                            </div>
+                          {% else %}
+                            <span class="badge text-bg-warning">Nao perguntado</span>
+                          {% endif %}
+                        </td>
+                        <td class="text-end">
+                          {% if decisao and decisao.vigente and finalidade.revogavel
+                                and tem_permissao(Permissao.ALUNO_EDITAR) %}
+                            <form method="post"
+                                  action="{{ url_for('alunos.revogar_consentimento', aluno_id=aluno.id, consentimento_id=decisao.id) }}"
+                                  data-confirmar
+                                  data-confirmar-titulo="Revogar consentimento"
+                                  data-confirmar-texto="A escola deixara de usar os dados de {{ aluno.nome_exibicao }} para {{ finalidade.rotulo | lower }}. O registro anterior e preservado como prova."
+                                  data-confirmar-botao="Revogar">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <button type="submit" class="btn btn-sm btn-outline-danger">
+                                Revogar
+                              </button>
+                            </form>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# --- Registrar decisao --- #}
+        <div class="col-12 col-xl-5">
+          {% if tem_permissao(Permissao.ALUNO_EDITAR) %}
+            <div class="card">
+              <div class="card-header">
+                <i class="bi bi-pencil-square text-primary"></i> Registrar decisao
+              </div>
+              <div class="card-body">
+                {% if not aluno.vinculos_responsaveis %}
+                  <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Vincule ao menos um responsavel antes de registrar
+                    consentimento. Autorizacao sem responsavel identificado
+                    nao tem valor probatorio.
+                  </div>
+                {% else %}
+                  <form method="post"
+                        action="{{ url_for('alunos.registrar_consentimento', aluno_id=aluno.id) }}">
+                    {{ form_consentimento.csrf_token }}
+                    <div class="row g-3">
+                      <div class="col-12">
+                        {{ selecao(form_consentimento.finalidade) }}
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        {{ selecao(form_consentimento.concedido) }}
+                      </div>
+                      <div class="col-12 col-sm-6">
+                        {{ campo(form_consentimento.data_decisao) }}
+                      </div>
+                      <div class="col-12">
+                        {{ selecao(form_consentimento.responsavel_id) }}
+                      </div>
+                      <div class="col-12">
+                        {{ campo(form_consentimento.documento) }}
+                      </div>
+                      <div class="col-12">
+                        {{ area_texto(form_consentimento.observacao, linhas=2) }}
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">
+                      <i class="bi bi-check2"></i> Registrar decisao
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        {# --- Historico --- #}
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <i class="bi bi-clock-history text-primary"></i> Historico de decisoes
+            </div>
+            <div class="card-body p-0">
+              {% if historico_consentimentos %}
+                <div class="sge-tabela-wrapper">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Finalidade</th>
+                        <th>Decisao</th>
+                        <th>Quem decidiu</th>
+                        <th class="d-none d-lg-table-cell">Termo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for registro in historico_consentimentos %}
+                        <tr>
+                          <td class="sge-numerico">{{ registro.data_decisao | data }}</td>
+                          <td>{{ registro.finalidade.rotulo }}</td>
+                          <td>
+                            <span class="badge sge-badge-suave text-bg-{{ registro.situacao_cor }}">
+                              {{ registro.situacao_rotulo }}
+                            </span>
+                            {% if registro.revogado_em %}
+                              <div class="small sge-texto-fraco">
+                                em {{ registro.revogado_em | data }}
+                              </div>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {{ registro.nome_de_quem_decidiu }}
+                            {% if registro.registrado_por %}
+                              <div class="small sge-texto-fraco">
+                                registrado por {{ registro.registrado_por.nome_completo }}
+                              </div>
+                            {% endif %}
+                          </td>
+                          <td class="d-none d-lg-table-cell small">
+                            {{ registro.documento or '—' }}
+                            {% if registro.observacao %}
+                              <div class="sge-texto-fraco">{{ registro.observacao | truncar(90) }}</div>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="sge-vazio">
+                  <i class="bi bi-shield-exclamation"></i>
+                  <h5>Nenhuma decisao registrada</h5>
+                  <p class="small sge-texto-suave mb-0">
+                    O historico guarda cada decisao da familia. Registros
+                    anteriores nunca sao apagados: e o que prova, depois, que
+                    a autorizacao existia na epoca.
+                  </p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

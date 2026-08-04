@@ -8,13 +8,15 @@ from flask_login import current_user, login_required
 from app.blueprints.alunos import bp
 from app.blueprints.alunos.formularios import (
     AlunoForm,
+    ConsentimentoForm,
     FiltroAlunoForm,
     VincularResponsavelForm,
 )
 from app.extensions import db
+from app.models.enums import FinalidadeTratamento
 from app.models.estrutura import Turma
 from app.models.pessoas import Aluno, Responsavel
-from app.services import aluno_service
+from app.services import aluno_service, consentimento_service
 from app.services.excecoes import ErroArquivo, ErroDominio
 from app.utils.arquivos import (
     remover_arquivo,
@@ -119,6 +121,10 @@ def detalhe(aluno_id: int):
         resumo=aluno_service.resumo_academico(aluno),
         pode_ver_saude=aluno_service.pode_ver_dados_sensiveis(),
         form_responsavel=_montar_form_responsavel(),
+        consentimentos=consentimento_service.painel(aluno.id),
+        historico_consentimentos=consentimento_service.historico(aluno.id),
+        pendencias_lgpd=consentimento_service.pendencias(aluno.id),
+        form_consentimento=_montar_form_consentimento(aluno),
     )
 
 
@@ -134,6 +140,32 @@ def _montar_form_responsavel() -> VincularResponsavelForm:
     form.responsavel_id.choices = [("", "Selecione um responsavel")] + [
         (str(r.id), f"{r.nome_completo} ({r.cpf_formatado or 'sem CPF'})")
         for r in responsaveis
+    ]
+    return form
+
+
+def _montar_form_consentimento(aluno: Aluno) -> ConsentimentoForm:
+    """Formulario de decisao, restrito ao que faz sentido oferecer.
+
+    Duas listas fechadas, e ambas importam:
+
+    * apenas finalidades que **dependem** de consentimento. Oferecer o
+      historico escolar daria a impressao de uma escolha que nao existe — a
+      escola nao para de emitir historico se a familia disser nao;
+    * apenas os responsaveis **deste** aluno. A lista completa transformaria
+      um erro de clique em consentimento assinado pela familia errada, e o
+      service recusaria depois com uma mensagem que ninguem entenderia.
+    """
+    form = ConsentimentoForm()
+
+    form.finalidade.choices = [
+        (finalidade.value, finalidade.rotulo)
+        for finalidade in FinalidadeTratamento.que_exigem_consentimento()
+    ]
+    form.responsavel_id.choices = [("", "Selecione o responsavel")] + [
+        (str(vinculo.responsavel.id), vinculo.responsavel.nome_completo)
+        for vinculo in aluno.vinculos_responsaveis
+        if vinculo.responsavel is not None
     ]
     return form
 
@@ -247,6 +279,76 @@ def remover_foto(aluno_id: int):
         flash("Foto removida.", "success")
 
     return redirect(url_for("alunos.editar", aluno_id=aluno_id))
+
+
+# ---------------------------------------------------------------------------
+# Consentimento (LGPD)
+# ---------------------------------------------------------------------------
+@bp.route("/<int:aluno_id>/consentimentos", methods=["POST"])
+@login_required
+@requer_permissao(Permissao.ALUNO_EDITAR)
+@exigir_acesso_aluno()
+def registrar_consentimento(aluno_id: int):
+    """Registra uma decisao da familia sobre uma finalidade de tratamento."""
+    aluno = aluno_service.buscar(aluno_id)
+    form = _montar_form_consentimento(aluno)
+
+    if not form.validate_on_submit():
+        primeiro_erro = next(
+            (msgs[0] for msgs in form.errors.values() if msgs), "Dados invalidos."
+        )
+        flash(primeiro_erro, "danger")
+        return redirect(url_for("alunos.detalhe", aluno_id=aluno_id))
+
+    responsavel = None
+    if form.responsavel_id.data:
+        responsavel = db.session.get(Responsavel, int(form.responsavel_id.data))
+
+    try:
+        consentimento_service.registrar(
+            aluno,
+            form.finalidade.data,
+            concedido=form.concedido.data == "1",
+            responsavel=responsavel,
+            autor=current_user,
+            documento=form.documento.data,
+            observacao=form.observacao.data,
+            data_decisao=form.data_decisao.data,
+        )
+    except ErroDominio as erro:
+        flash(erro.mensagem, "danger")
+    else:
+        flash("Decisao registrada.", "success")
+
+    return redirect(url_for("alunos.detalhe", aluno_id=aluno_id))
+
+
+@bp.route(
+    "/<int:aluno_id>/consentimentos/<int:consentimento_id>/revogar",
+    methods=["POST"],
+)
+@login_required
+@requer_permissao(Permissao.ALUNO_EDITAR)
+@exigir_acesso_aluno()
+def revogar_consentimento(aluno_id: int, consentimento_id: int):
+    """Encerra um consentimento vigente."""
+    registro = consentimento_service.buscar(consentimento_id)
+
+    # O id do consentimento vem da URL: sem esta conferencia, trocar o numero
+    # revogaria o consentimento de outro aluno — o decorador de escopo valida
+    # o `aluno_id`, nao o registro pendurado nele.
+    if registro.aluno_id != aluno_id:
+        flash("Registro nao pertence a este aluno.", "danger")
+        return redirect(url_for("alunos.detalhe", aluno_id=aluno_id))
+
+    try:
+        consentimento_service.revogar(registro, autor=current_user)
+    except ErroDominio as erro:
+        flash(erro.mensagem, "danger")
+    else:
+        flash("Consentimento revogado.", "success")
+
+    return redirect(url_for("alunos.detalhe", aluno_id=aluno_id))
 
 
 # ---------------------------------------------------------------------------

@@ -36,8 +36,10 @@ from app.models.base import (
 from app.models.comunicacao import Aviso, AvisoLeitura
 from app.models.enums import (
     AcaoAuditoria,
+    BaseLegalLGPD,
     DiaSemana,
     EstadoCivil,
+    FinalidadeTratamento,
     NivelEnsino,
     PapelUsuario,
     Parentesco,
@@ -63,6 +65,7 @@ from app.models.estrutura import (
 )
 from app.models.frequencia import Aula, Frequencia
 from app.models.horario import Horario, TempoAula
+from app.models.lgpd import ConsentimentoLGPD
 from app.models.matricula import Matricula
 from app.models.mixins import EnderecoMixin, PessoaMixin, VinculoUsuarioMixin
 from app.models.pessoas import (
@@ -104,6 +107,8 @@ __all__ = [
     "PublicoAviso",
     "PrioridadeAviso",
     "AcaoAuditoria",
+    "BaseLegalLGPD",
+    "FinalidadeTratamento",
     # Identidade
     "Usuario",
     # Estrutura academica
@@ -135,6 +140,7 @@ __all__ = [
     "AvisoLeitura",
     # Infraestrutura
     "ConfiguracaoEscola",
+    "ConsentimentoLGPD",
     "LogAuditoria",
     "RegistroBackup",
 ]

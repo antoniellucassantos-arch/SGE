@@ -298,6 +298,142 @@ class AcaoAuditoria(EnumDominio):
     ACESSO_DADO_PESSOAL = (
         "acesso_dado_pessoal", "Acesso a dado pessoal", "warning"
     )
+    CONSENTIMENTO = ("consentimento", "Consentimento LGPD", "primary")
+
+
+# ---------------------------------------------------------------------------
+# LGPD
+# ---------------------------------------------------------------------------
+class BaseLegalLGPD(EnumDominio):
+    """Hipoteses legais que autorizam o tratamento (LGPD, arts. 7 e 11).
+
+    Toda finalidade precisa de **uma** base legal. Consentimento e apenas uma
+    delas, e nao e a mais comum numa escola: matricula, historico e diario de
+    classe sao obrigacao legal, e pedir consentimento para eles seria
+    enganoso — a escola nao pode parar de emitir historico se a familia
+    disser nao.
+
+    Distinguir as bases importa na pratica: so o que se apoia em
+    consentimento pode ser revogado.
+    """
+
+    OBRIGACAO_LEGAL = (
+        "obrigacao_legal", "Obrigacao legal (art. 7, II)", "secondary"
+    )
+    EXECUCAO_CONTRATO = (
+        "execucao_contrato", "Execucao de contrato (art. 7, V)", "secondary"
+    )
+    TUTELA_DA_SAUDE = (
+        "tutela_da_saude", "Tutela da saude (art. 11, II, f)", "danger"
+    )
+    PROTECAO_DA_VIDA = (
+        "protecao_da_vida", "Protecao da vida (art. 7, VII)", "danger"
+    )
+    CONSENTIMENTO = ("consentimento", "Consentimento (art. 7, I)", "primary")
+
+
+class FinalidadeTratamento(EnumDominio):
+    """Para que a escola trata os dados do aluno.
+
+    A base legal e atributo da **finalidade**, nao da decisao individual: a
+    escola nao escolhe aluno a aluno se o dado de saude e tratado sob tutela
+    da saude ou sob consentimento — isso e fixado pela lei. Amarrar os dois
+    aqui impede que se registre uma combinacao incoerente.
+
+    ``exige_consentimento`` deriva da base legal, com uma excecao proposital:
+    saude se apoia na tutela da saude (art. 11, II, "f"), entao a escola
+    **pode** tratar mesmo sem autorizacao assinada — mas coleta a autorizacao
+    do responsavel assim mesmo, porque e o que permite ligar para o medico e
+    porque a familia tem direito de saber o que a escola guarda.
+
+    Este conjunto e o padrao de uma escola brasileira. Ajuste-o com o
+    encarregado de dados (DPO) da escola: acrescentar finalidade e
+    acrescentar um membro aqui.
+    """
+
+    def __new__(
+        cls,
+        valor: str,
+        rotulo: str = "",
+        cor: str = "secondary",
+        base_legal: BaseLegalLGPD | None = None,
+        revogavel: bool = False,
+        descricao: str = "",
+    ):
+        obj = str.__new__(cls, valor)
+        obj._value_ = valor
+        obj.rotulo = rotulo or valor.replace("_", " ").capitalize()
+        obj.cor = cor
+        obj.base_legal = base_legal or BaseLegalLGPD.CONSENTIMENTO
+        obj.revogavel = revogavel
+        obj.descricao = descricao
+        return obj
+
+    @property
+    def exige_consentimento(self) -> bool:
+        """Se a familia precisa autorizar antes de a escola tratar."""
+        return self.base_legal is BaseLegalLGPD.CONSENTIMENTO
+
+    VIDA_ESCOLAR = (
+        "vida_escolar",
+        "Matricula e vida escolar",
+        "secondary",
+        BaseLegalLGPD.EXECUCAO_CONTRATO,
+        False,
+        "Cadastro, matricula, turma, boletim e frequencia.",
+    )
+    REGISTRO_OBRIGATORIO = (
+        "registro_obrigatorio",
+        "Registro academico obrigatorio",
+        "secondary",
+        BaseLegalLGPD.OBRIGACAO_LEGAL,
+        False,
+        "Historico escolar, diario de classe e censo escolar.",
+    )
+    SAUDE_E_EMERGENCIA = (
+        "saude_e_emergencia",
+        "Saude e emergencia",
+        "danger",
+        BaseLegalLGPD.TUTELA_DA_SAUDE,
+        False,
+        "Alergia, medicamento continuo e condicao de saude, para socorro.",
+    )
+    SAIDA_DESACOMPANHADA = (
+        "saida_desacompanhada",
+        "Saida desacompanhada",
+        "warning",
+        BaseLegalLGPD.CONSENTIMENTO,
+        True,
+        "Autorizacao para o aluno sair da escola sozinho.",
+    )
+    USO_DE_IMAGEM = (
+        "uso_de_imagem",
+        "Uso de imagem",
+        "info",
+        BaseLegalLGPD.CONSENTIMENTO,
+        True,
+        "Foto e video em mural, site e material da escola.",
+    )
+    COMUNICACAO_INSTITUCIONAL = (
+        "comunicacao_institucional",
+        "Comunicacao nao essencial",
+        "info",
+        BaseLegalLGPD.CONSENTIMENTO,
+        True,
+        "Mensagens alem dos avisos academicos: eventos, campanhas, pesquisas.",
+    )
+    COMPARTILHAMENTO_EXTERNO = (
+        "compartilhamento_externo",
+        "Compartilhamento com terceiros",
+        "warning",
+        BaseLegalLGPD.CONSENTIMENTO,
+        True,
+        "Envio a parceiros: fotografo, sistema de transporte, plano de saude.",
+    )
+
+    @classmethod
+    def que_exigem_consentimento(cls) -> list[FinalidadeTratamento]:
+        return [membro for membro in cls if membro.exige_consentimento]
 
 
 __all__ = [
@@ -318,4 +454,6 @@ __all__ = [
     "PublicoAviso",
     "PrioridadeAviso",
     "AcaoAuditoria",
+    "BaseLegalLGPD",
+    "FinalidadeTratamento",
 ]
