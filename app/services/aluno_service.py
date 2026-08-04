@@ -97,15 +97,39 @@ _BOOLEANOS_SENSIVEIS: frozenset[str] = frozenset(
 )
 
 
+def _registrar_acesso(aluno: Aluno) -> None:
+    """Anota na trilha que os campos sensiveis deste aluno foram entregues.
+
+    Chamado apenas quando eles **saem de fato**. Duas consequencias do
+    recorte, ambas deliberadas:
+
+    * a listagem nao registra nada. Ela mostra nome, codigo e turma — nao
+      documento nem saude. Uma linha por aluno por pagina aberta afogaria o
+      evento que interessa no meio do ruido;
+    * a ficha filtrada (professor) tambem nao registra. Nao houve acesso a
+      dado sensivel; registrar seria encher a trilha de eventos vazios.
+    """
+    auditoria_service.registrar_acesso_dado_pessoal(
+        "Aluno",
+        aluno.id,
+        Aluno.CAMPOS_SENSIVEIS,
+        descricao=f"Consulta a documentos e saude de {aluno.nome_exibicao}",
+    )
+
+
 def montar_ficha(aluno: Aluno, usuario=None) -> FichaAluno:
     """Embrulha o aluno na visao permitida ao usuario."""
-    return FichaAluno(aluno, pode_ver_dados_sensiveis(usuario))
+    completa = pode_ver_dados_sensiveis(usuario)
+    if completa:
+        _registrar_acesso(aluno)
+    return FichaAluno(aluno, completa)
 
 
 def montar_fichas(alunos, usuario=None) -> list[FichaAluno]:
     """Versao em lote, para listagens.
 
     A permissao e resolvida uma vez so: ela nao muda no meio de uma pagina.
+    Nao registra acesso — ver :func:`_registrar_acesso`.
     """
     completa = pode_ver_dados_sensiveis(usuario)
     return [FichaAluno(aluno, completa) for aluno in alunos]
@@ -119,7 +143,11 @@ def serializar(aluno: Aluno, usuario=None) -> dict[str, Any]:
     existe e que o usuario nao tem acesso — enquanto a ausencia nao informa
     nada.
     """
-    excluir = None if pode_ver_dados_sensiveis(usuario) else Aluno.CAMPOS_SENSIVEIS
+    completa = pode_ver_dados_sensiveis(usuario)
+    if completa:
+        _registrar_acesso(aluno)
+
+    excluir = None if completa else Aluno.CAMPOS_SENSIVEIS
     return aluno.para_dicionario(excluir=excluir)
 
 

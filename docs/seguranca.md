@@ -199,17 +199,35 @@ Trilha imutável em `logs_auditoria`. Não existe rota de edição ou exclusão
 individual.
 
 Registra: criação, atualização (com o *delta* antes/depois), exclusão, login,
-falha de login, acesso negado, alteração de senha, backup, restauração e
-exportação.
+falha de login, acesso negado, alteração de senha, backup, restauração,
+exportação e **acesso a dado pessoal**.
+
+### Registro de leitura (`acesso_dado_pessoal`)
+
+A trilha sabia dizer quem *alterou* a ficha de um aluno, nunca quem a *leu* —
+e é a leitura que precede um vazamento. Sem esse registro, a escola descobre
+que a ficha saiu mas não por qual conta.
+
+O evento é gravado quando os campos de `Aluno.CAMPOS_SENSIVEIS` são
+**efetivamente entregues**: ao abrir a ficha completa e ao serializar o aluno
+para a API. Não é gravado na listagem (que mostra nome, código e turma) nem
+na ficha filtrada que o professor recebe. O recorte é deliberado: uma linha
+por aluno por página aberta afogaria o evento que importa.
+
+O detalhamento guarda os **nomes** dos campos entregues, nunca os valores.
+Copiar o dado sensível para a tabela de auditoria criaria uma segunda cópia
+dele, com retenção maior e sem os controles de acesso da original.
 
 **Decisões de implementação:**
 
 - **Falha silenciosa proposital.** Se a gravação do log falhar, a operação do
   usuário não é abortada — a escola não pode ficar sem lançar notas porque a
   auditoria teve um problema. A falha vai para o log da aplicação.
-- **Sessão separada para eventos negativos.** Falha de login e acesso negado
-  são gravados com commit imediato, porque a transação principal sofre
-  rollback logo em seguida.
+- **Sessão separada para eventos negativos e para leitura.** Falha de login,
+  acesso negado e acesso a dado pessoal são gravados com commit imediato.
+  Nos dois primeiros porque a transação principal sofre rollback logo em
+  seguida; no terceiro porque abrir uma ficha é um `GET` — nada mais na
+  requisição faz commit, e o registro se perderia no teardown.
 - **Cópia do nome do usuário.** A trilha permanece legível mesmo após a
   exclusão da conta.
 - **Campos sensíveis mascarados.** Senhas e tokens nunca aparecem no detalhe.
@@ -224,12 +242,27 @@ exportação.
 | Dados sensíveis (art. 11) | Saúde e deficiência visíveis apenas a administrador, direção e secretaria |
 | Consentimento | Autorização de uso de imagem registrada por aluno |
 | Geolocalização | EXIF removido de toda imagem enviada |
-| Rastreabilidade | Auditoria registra quem acessou e alterou o quê |
+| Rastreabilidade (alteração) | Auditoria registra quem alterou o quê, com o delta |
+| Rastreabilidade (leitura) | `acesso_dado_pessoal` registra quem consultou documentos e saúde de qual aluno |
 | Retenção | Comando `flask limpar-auditoria --dias N` |
 
 **Pendente para a escola:** publicar a política de privacidade, designar o
 encarregado de dados (DPO) e definir o procedimento de atendimento a
 solicitações de titulares.
+
+**Pendente no sistema** — itens estruturais ainda em aberto:
+
+- **Base legal e consentimento por finalidade.** Hoje há apenas o campo de
+  autorização de uso de imagem no cadastro do aluno. Falta o registro de
+  *quem* consentiu, *quando*, para *qual finalidade* e sob qual base legal —
+  e a revogação.
+- **Retenção diferenciada.** `flask limpar-auditoria --dias N` apaga tudo
+  que passa do prazo, sem distinguir classes de evento. A trilha de acesso a
+  dado pessoal e os acessos negados provavelmente merecem prazo maior que um
+  log de atualização de turma. Definir os prazos é decisão da escola.
+- **Criptografia dos campos sensíveis em repouso.** Hoje a proteção é de
+  acesso (permissão + filtro no service). Quem tiver o arquivo do banco lê
+  tudo.
 
 ---
 

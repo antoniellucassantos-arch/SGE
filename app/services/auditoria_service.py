@@ -20,6 +20,7 @@ exclusao ou renomeacao da conta.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -260,6 +261,39 @@ def registrar_acesso_negado(motivo: str):
         descricao=motivo[:255],
         usuario_id=usuario_id,
         usuario_nome=usuario_nome,
+        commit_imediato=True,
+    )
+
+
+def registrar_acesso_dado_pessoal(
+    entidade: str,
+    entidade_id: int,
+    campos: Iterable[str],
+    descricao: str | None = None,
+):
+    """Registra a **leitura** de dado pessoal sensivel.
+
+    Existe porque a trilha so sabia dizer quem alterou um registro. A LGPD
+    exige rastrear tambem quem consultou, quando o dado e de saude de menor
+    de idade — e e a consulta que precede um vazamento.
+
+    Grava em sessao propria (``commit_imediato``) por um motivo concreto:
+    abrir uma ficha e um ``GET``, e em um GET nada mais na requisicao faz
+    commit. Sem isso o ``db.session.remove()`` do teardown levaria o
+    registro junto, e a trilha exigida por lei ficaria vazia justamente nas
+    telas de consulta.
+
+    Os **nomes** dos campos entregues vao para o detalhamento; os valores,
+    nunca. Copiar o dado sensivel para a tabela de auditoria criaria uma
+    segunda copia dele, com retencao maior e sem os controles de acesso da
+    original — trocaria um problema de rastreabilidade por um de exposicao.
+    """
+    return registrar(
+        AcaoAuditoria.ACESSO_DADO_PESSOAL,
+        entidade=entidade,
+        entidade_id=entidade_id,
+        descricao=descricao or f"Consulta a dados sensiveis de {entidade}",
+        detalhes={"campos": sorted(campos)},
         commit_imediato=True,
     )
 

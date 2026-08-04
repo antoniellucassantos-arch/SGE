@@ -290,6 +290,15 @@ class AcaoAuditoria(EnumDominio):
     RESTAURACAO = ("restauracao", "Restauracao", "danger")
     EXPORTACAO = ("exportacao", "Exportacao", "info")
 
+    # A trilha registrava quem *alterou* a ficha de um aluno, nunca quem a
+    # *leu*. A LGPD exige rastrear a leitura quando o dado e de saude de
+    # menor de idade (art. 11 e art. 37): sem isso, um vazamento nao tem como
+    # ser investigado — a escola sabe que a ficha saiu, mas nao por qual
+    # conta.
+    ACESSO_DADO_PESSOAL = (
+        "acesso_dado_pessoal", "Acesso a dado pessoal", "warning"
+    )
+
 
 __all__ = [
     "EnumDominio",
