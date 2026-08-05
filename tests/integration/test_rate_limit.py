@@ -23,7 +23,20 @@ from tests.conftest import SENHA_PADRAO, criar_usuario
 
 @pytest.fixture
 def app_com_limite(monkeypatch):
-    """Aplicacao de teste com o limitador ligado e limite curto."""
+    """Aplicacao de teste com o limitador ligado e limite curto.
+
+    A limpeza no fim nao e zelo: sem ela, este arquivo derruba o resto da
+    suite. O ``limiter`` e um objeto de modulo, compartilhado por todas as
+    aplicacoes criadas no processo. Ligado aqui, ele **continua ligado**
+    depois — a factory so chama ``init_app`` quando ``RATELIMIT_ENABLED`` e
+    verdadeiro, entao nada o desliga de volta.
+
+    O efeito e traicoeiro: os logins de todos os testes seguintes contam
+    contra a mesma cota de 127.0.0.1. Passada a cota, ``autenticar()`` recebe
+    429 em silencio, o cliente segue anonimo, e os testes quebram com 302
+    onde esperavam 200 ou 403 — longe daqui, sem nada apontando para ca.
+    Foi o que aconteceu: apareceu so quando a suite passou de 370 testes.
+    """
     monkeypatch.setattr(TestingConfig, "RATELIMIT_ENABLED", True)
     monkeypatch.setattr(TestingConfig, "RATELIMIT_LOGIN", "3 per minute")
 
@@ -31,13 +44,23 @@ def app_com_limite(monkeypatch):
 
     with aplicacao.app_context():
         _db.create_all()
+        limiter.reset()  # comeca com a cota inteira, venha de onde vier
         yield aplicacao
+
+        # `reset()` precisa do contexto da aplicacao para achar o
+        # armazenamento — fora do `with` ele nao limpa nada.
+        limiter.reset()
         _db.session.remove()
         _db.drop_all()
 
-    # O armazenamento e do processo, nao da aplicacao: sem esta limpeza, o
-    # proximo teste comecaria com a cota ja gasta.
-    limiter.reset()
+    # Desligar explicitamente, e nao "restaurar o valor anterior": o
+    # `Limiter` nasce com `enabled=True`, entao restaurar deixaria ligado.
+    #
+    # O que mantinha o limitador inerte na suite nao era essa bandeira, e sim
+    # o `init_app` nunca ter sido chamado. Depois da primeira chamada — que
+    # este teste faz de proposito — o objeto fica armado para o processo
+    # inteiro, e so um `enabled = False` o desarma.
+    limiter.enabled = False
 
 
 @pytest.fixture
@@ -101,3 +124,27 @@ class TestForcaBrutaNoLogin:
         horas para ser encontrada.
         """
         assert app.config["RATELIMIT_ENABLED"] is False
+
+
+class TestLimitadorNaoVazaParaOResto:
+    """A fixture acima liga um objeto de modulo. Ela precisa desliga-lo.
+
+    Este teste roda **depois** de `TestForcaBrutaNoLogin` (ordem de
+    declaracao no arquivo) e confere que a limpeza aconteceu. Sem ele, o
+    vazamento so apareceria daqui a alguns meses, como um 302 inexplicavel
+    em outro arquivo — que foi exatamente como apareceu da primeira vez.
+    """
+
+    def test_limitador_ficou_desarmado(self):
+        assert limiter.enabled is False
+
+    def test_logins_repetidos_nao_tomam_429(self, app, cliente, admin):
+        """O padrao da suite: varios testes autenticando em sequencia."""
+        for _ in range(8):
+            resposta = cliente.post(
+                "/auth/login",
+                data={"email": admin.email, "senha": SENHA_PADRAO},
+            )
+            assert resposta.status_code != 429, (
+                "o limitador ficou ligado e vai derrubar o resto da suite"
+            )
