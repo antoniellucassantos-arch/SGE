@@ -229,11 +229,13 @@ def exportar_alunos():
     )
 
 
-@bp.route("/frequencia")
-@login_required
-@requer_permissao(Permissao.RELATORIO_ACADEMICO)
-def frequencia():
-    """Atalho para o relatorio de frequencia em risco."""
-    from flask import redirect, url_for
-
-    return redirect(url_for("relatorios.visualizar", chave="frequencia"))
+# Nao existe mais um atalho `relatorios.frequencia`.
+#
+# Ele respondia em `/relatorios/frequencia` e redirecionava para
+# `url_for("relatorios.visualizar", chave="frequencia")` — que constroi
+# exatamente `/relatorios/frequencia`. Como o Werkzeug prefere a regra
+# estatica a regra com variavel, o caminho voltava para o proprio atalho:
+# no navegador, ERR_TOO_MANY_REDIRECTS.
+#
+# A rota generica `/<chave>` ja atende esse endereco. Quem precisa do link
+# usa `url_for("relatorios.visualizar", chave="frequencia")`.

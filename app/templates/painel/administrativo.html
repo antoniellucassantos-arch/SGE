@@ -102,7 +102,7 @@
           {{ indicador_alerta('Alunos com risco de frequencia',
                               complementares.alunos_risco_frequencia,
                               'bi-exclamation-triangle',
-                              url_for('relatorios.frequencia'),
+                              url_for('relatorios.visualizar', chave='frequencia'),
                               'perigo') }}
         </div>
       {% endif %}
