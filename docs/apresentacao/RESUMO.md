@@ -248,14 +248,26 @@ Pasta: **`docs/apresentacao/`**
 
 ```
 docs/apresentacao/
+├── adm.html           ← 10 telas do administrador   (2,9 MB)
+├── professor.html     ←  7 telas do professor       (1,3 MB)
+├── aluno.html         ←  5 telas do aluno           (0,7 MB)
+├── completo.html      ← os tres perfis juntos       (4,9 MB)
 ├── RESUMO.md          este documento
-├── desktop/           1440 px — para o projetor
-│   ├── adm/           10 telas
-│   ├── prof/           7 telas
-│   └── aluno/          5 telas
-├── celular/           500 px — mesma tela no telefone
-│   ├── adm/  prof/  aluno/
-└── html/              as páginas em HTML, se precisar abrir no navegador
+├── desktop/           as imagens soltas, 1440 px
+├── celular/           as mesmas, 500 px
+└── html/              as paginas em HTML, plano B
+```
+
+**Os quatro HTML sao autocontidos.** As imagens vao embutidas no proprio
+arquivo, entao funcionam num pendrive, em outro computador, sem servidor e
+sem Python. Navegacao pelas setas do teclado; o botao **Celular** mostra a
+mesma tela na largura de um telefone.
+
+Para regerar tudo:
+
+```bash
+python scripts/gerar_prints.py
+python scripts/gerar_apresentacao.py
 ```
 
 **44 imagens.** As de `desktop/` são as do projetor; as de `celular/`
