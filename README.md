@@ -11,6 +11,61 @@ Bootstrap 5 · Chart.js
 
 ---
 
+## Testar em 3 minutos
+
+No Windows, dois cliques duplos:
+
+| Passo | Arquivo | O que faz |
+|---|---|---|
+| 1️⃣ | **`PREPARAR.bat`** | Instala tudo e cria uma escola de exemplo com 60 alunos. Só na primeira vez. |
+| 2️⃣ | **`INICIAR.bat`** | Sobe o sistema e abre o navegador em `http://localhost:5000` |
+
+Em Linux ou macOS, o equivalente:
+
+```bash
+python3.12 -m venv venv && source venv/bin/activate
+pip install -e ".[dev]"
+export FLASK_APP=run.py
+flask db upgrade && flask criar-estrutura-inicial
+flask popular-demonstracao --alunos 60 --yes
+python scripts/criar_contas_de_teste.py
+python run.py
+```
+
+### Contas para entrar
+
+Senha **`1234`** nas três:
+
+| Conta | Perfil | O que enxerga |
+|---|---|---|
+| `adm@gmail.com` | Administrador | Tudo: cadastros, relatórios, usuários, auditoria, backup |
+| `prof@gmail.com` | Professor | Só as próprias turmas — diário, chamada, notas, boletim |
+| `aluno@gmail.com` | Aluno | Só os próprios dados — boletim, frequência, horário |
+
+> As três contas existem apenas em desenvolvimento. O script que as cria se
+> recusa a rodar em produção, e a senha `1234` não passa pela política de
+> senha do sistema — ela é gravada por baixo, de propósito, para facilitar o
+> teste.
+
+### O que vale olhar
+
+1. Entre como **professor** e tente abrir `/turmas/4` — uma turma em que ele
+   não leciona. O sistema responde **403** e registra a tentativa na
+   auditoria. É a segunda camada de autorização funcionando.
+2. Entre como **administrador** → *Auditoria*. A tentativa do professor está
+   lá, com IP e horário.
+3. Abra a **ficha de um aluno** → aba *Consentimentos*: base legal por
+   finalidade, quem autorizou e a revogação (LGPD).
+4. Abra qualquer tela **pelo celular**, na mesma rede: `http://SEU-IP:5000`
+
+Para rodar a suíte de testes:
+
+```bash
+pytest -q
+```
+
+---
+
 ## Sumário
 
 - [Instalação](#instalação)
