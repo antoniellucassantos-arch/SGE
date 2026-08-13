@@ -78,3 +78,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Capturas geradas para apresentacao. O script que as produz esta
+# versionado (scripts/gerar_prints.py); as imagens, nao — sao 4,5 MB que
+# mudam a cada execucao e sempre podem ser refeitas.
+docs/apresentacao/desktop/
+docs/apresentacao/celular/
+docs/apresentacao/html/
