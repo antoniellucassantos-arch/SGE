@@ -244,8 +244,12 @@ const etiqueta = document.getElementById('etiqueta');
 const contador = document.getElementById('contador');
 
 function desenhar() {
-  document.querySelectorAll('.item').forEach((b, i) => {
-    b.classList.toggle('ativo', i === atual);
+  // Compara com o indice declarado no proprio botao. Usar a posicao do
+  // elemento na lista quebrou uma vez: o botao "Visao geral" tambem tem a
+  // classe `item`, entao tudo andava uma casa — clicava em "Ficha do aluno"
+  // e abria "Turmas".
+  document.querySelectorAll('[data-indice]').forEach((b) => {
+    b.classList.toggle('ativo', Number(b.dataset.indice) === atual);
   });
 
   if (atual < 0) {
@@ -273,8 +277,8 @@ function ir(indice) {
   desenhar();
 }
 
-document.querySelectorAll('.item').forEach((botao, i) => {
-  botao.addEventListener('click', () => ir(i));
+document.querySelectorAll('[data-indice]').forEach((botao) => {
+  botao.addEventListener('click', () => ir(Number(botao.dataset.indice)));
 });
 document.getElementById('capa').addEventListener('click', () => ir(-1));
 
@@ -331,6 +335,7 @@ def _montar(titulo_pagina: str, subtitulo: str, perfis: tuple[str, ...]) -> str:
     # perfil no arquivo — num arquivo de perfil unico o cabecalho seria
     # repeticao do titulo da pagina.
     lateral = []
+    indice = 0
     for chave in perfis:
         if len(perfis) > 1:
             nome, resumo = PERFIS[chave]
@@ -339,7 +344,11 @@ def _montar(titulo_pagina: str, subtitulo: str, perfis: tuple[str, ...]) -> str:
             )
         for perfil, _, titulo, _ in TELAS:
             if perfil == chave:
-                lateral.append(f'<button class="item">{titulo}</button>')
+                lateral.append(
+                    f'<button class="item" data-indice="{indice}">'
+                    f"{titulo}</button>"
+                )
+                indice += 1
 
     numeros = "".join(
         f'<div class="numero"><b>{valor}</b><span>{rotulo}</span></div>'
